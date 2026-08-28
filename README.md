@@ -24,3 +24,7 @@ The publishable key is intended for browser use. Never add a Supabase secret/ser
 - Add real-time messaging
 - Add mutual approval/reveal RPCs with strict RLS
 - Connect a payment provider through a server/webhook flow
+
+
+## Production email redirect
+Email confirmation is configured to return to `https://sanjayhari54.github.io/uncover/login.html`.

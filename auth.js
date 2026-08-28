@@ -47,7 +47,7 @@
     async signUp({ email, password, display_name }) {
       const sb = getClient();
       if (!sb) throw new Error('Supabase has not loaded yet. Refresh and try again.');
-      const { data, error } = await sb.auth.signUp({ email, password, options: { emailRedirectTo: window.location.origin + window.location.pathname.replace(/[^/]+$/, 'login.html') } });
+      const { data, error } = await sb.auth.signUp({ email, password, options: { emailRedirectTo: 'https://sanjayhari54.github.io/uncover/login.html' } });
       if (error) throw error;
       localStorage.setItem('uncover_profile_draft', JSON.stringify({ display_name }));
       if (data.user && data.session) await ensureProfile(data.user);
