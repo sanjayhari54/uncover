@@ -1,6 +1,26 @@
-# Uncover V3
-Premium static product prototype for Uncover: talk privately, like, mutually approve, then reveal profiles.
+# Uncover V4 — Supabase-connected MVP
 
-Pages: home, how-it-works, safety, pricing, about, signup, login, discover app, private chat, connections, profile.
+This version connects the static Uncover frontend to Supabase Auth and the `profiles` table.
 
-Next production phase: Supabase Auth + PostgreSQL + Realtime + Storage, server-side 3-conversation entitlement, moderation/reporting, then Stripe subscriptions and Vercel deployment.
+## Current real functionality
+- Email/password sign up
+- Email/password login
+- Auth guard for app pages
+- Automatic profile creation after login/session
+- Server-side free-chat counter display from `profiles`
+- Logout
+
+## Supabase project
+Configured for the Uncover Supabase project using the browser-safe publishable key.
+
+## Important
+The publishable key is intended for browser use. Never add a Supabase secret/service-role key to these files.
+
+## Before launch
+- Add production privacy policy and terms
+- Verify 18+ age controls and moderation
+- Implement server-side chat/usage enforcement
+- Add Storage rules for photos
+- Add real-time messaging
+- Add mutual approval/reveal RPCs with strict RLS
+- Connect a payment provider through a server/webhook flow
