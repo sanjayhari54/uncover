@@ -1,2 +1,2 @@
-const $=s=>document.querySelector(s);document.querySelectorAll('[data-toast]').forEach(b=>b.addEventListener('click',()=>{const t=$('#toast');t.textContent=b.dataset.toast;t.style.display='block';setTimeout(()=>t.style.display='none',2400)}));
-document.querySelectorAll('[data-demo]').forEach(b=>b.addEventListener('click',()=>{const t=$('#toast');t.textContent='Demo only — real accounts and chat are coming in the next build.';t.style.display='block';setTimeout(()=>t.style.display='none',2600)}));
+function showLike(){alert('Like sent privately. If they also approve, both profiles will be revealed.');}
+function skipCard(){alert('Passed. Finding another conversation…');}

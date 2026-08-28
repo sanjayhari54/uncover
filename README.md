@@ -1,17 +1,6 @@
-# Uncover MVP v2
-Premium minimalist static prototype for Uncover: Talk first. Reveal later. Connect for real.
+# Uncover V3
+Premium static product prototype for Uncover: talk privately, like, mutually approve, then reveal profiles.
 
-## Pages
-- index.html
-- how-it-works.html
-- safety.html
-- pricing.html
-- about.html
-- login.html
-- signup.html
-- chat-demo.html
+Pages: home, how-it-works, safety, pricing, about, signup, login, discover app, private chat, connections, profile.
 
-## Deploy
-Upload all files/folders to the root of the GitHub repository. Enable GitHub Pages from Settings > Pages > Deploy from branch > main > / (root).
-
-This is a frontend prototype. Do not collect real user data or payments until authentication, database, moderation and payment verification are implemented.
+Next production phase: Supabase Auth + PostgreSQL + Realtime + Storage, server-side 3-conversation entitlement, moderation/reporting, then Stripe subscriptions and Vercel deployment.
