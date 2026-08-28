@@ -12,7 +12,8 @@
       document.querySelectorAll('[data-user-name]').forEach(el=>el.textContent=name);
       const client=UncoverAuth.getClient();
       if(path==='app.html' && client){
-        const {data}=await client.from('profiles').select('free_chats_used,free_chats_limit,is_premium').eq('id',user.id).maybeSingle();
+        const {data}=await client.from('profiles').select('free_chats_used,free_chats_limit,is_premium,is_profile_complete').eq('id',user.id).maybeSingle();
+        if(data && !data.is_profile_complete){location.href='profile.html';return;}
         if(data){const remaining=Math.max(0,(data.free_chats_limit||3)-(data.free_chats_used||0));document.querySelectorAll('[data-free-remaining]').forEach(el=>el.textContent=remaining);}
       }
     }

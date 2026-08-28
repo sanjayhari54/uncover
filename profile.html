@@ -1,1 +1,65 @@
-<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Uncover — My Profile</title><link rel="stylesheet" href="styles.css"></head><body class="app-page"><header class="app-nav"><a class="brand" href="index.html"><span class="brand-mark">○</span> Uncover</a><nav><a href="app.html">Discover</a><a href="chat.html">Chats</a><a href="connections.html">Connections</a><a class="active" href="profile.html">My Profile</a></nav><a class="avatar" href="profile.html">S</a></header><main class="profile-wrap"><section class="profile-card"><div class="profile-cover"><div class="profile-avatar">S</div></div><div class="profile-body"><p class="eyebrow">YOUR PRIVATE PROFILE</p><h1>Sanjay</h1><p class="muted">Your full profile is only shown to people after mutual approval.</p><div class="profile-fields"><div><span>Looking for</span><strong>Friendship · Dating · Connection</strong></div><div><span>Interests</span><strong>Travel · Nature · Music · Learning</strong></div></div><button class="primary">Edit profile</button></div></section><aside class="privacy-card"><span class="lock">🔒</span><h2>You control your reveal.</h2><p>Choose what becomes visible after a mutual connection. You can block or report someone at any time.</p><a href="safety.html">Read our safety principles →</a></aside></main><button class="btn outline" data-signout style="margin:24px">Log out</button></body></html>
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Uncover — Create your profile</title><link rel="stylesheet" href="styles.css"></head><body class="app-page">
+<header class="app-nav"><a class="brand" href="index.html"><span class="brand-mark">○</span> Uncover</a><nav><a href="app.html">Discover</a><a href="chat.html">Chats</a><a href="connections.html">Connections</a><a class="active" href="profile.html">My Profile</a></nav><button class="avatar" data-signout title="Log out">U</button></header>
+<main class="profile-wrap profile-editor-wrap">
+<section class="profile-card profile-editor">
+  <div class="profile-cover"><div class="profile-avatar" id="avatarInitial">U</div></div>
+  <div class="profile-body">
+    <p class="eyebrow">YOUR PRIVATE PROFILE</p>
+    <h1 id="pageTitle">Create your profile</h1>
+    <p class="muted">Your name and photo stay private. Other people only see your full profile after you both approve the connection.</p>
+    <form id="profileForm">
+      <div class="form-grid">
+        <div class="field"><label for="displayName">Display name</label><input id="displayName" maxlength="40" required placeholder="How you'd like to be known"></div>
+        <div class="field"><label for="birthDate">Date of birth</label><input id="birthDate" type="date" required><small class="field-help">You must be 18 or older.</small></div>
+        <div class="field"><label for="gender">Gender</label><select id="gender"><option value="">Prefer not to say</option><option>Woman</option><option>Man</option><option>Non-binary</option><option>Other</option></select></div>
+        <div class="field"><label for="location">General location</label><input id="location" maxlength="80" placeholder="e.g. Kathmandu, Nepal"></div>
+      </div>
+      <div class="field"><label>What are you looking for?</label><div class="check-grid"><label class="check"><input type="checkbox" name="looking" value="Friendship"> Friendship</label><label class="check"><input type="checkbox" name="looking" value="Dating"> Dating</label><label class="check"><input type="checkbox" name="looking" value="Relationship"> Relationship</label></div></div>
+      <div class="field"><label>Interests</label><div class="check-grid interests"><label class="check"><input type="checkbox" name="interest" value="Music"> Music</label><label class="check"><input type="checkbox" name="interest" value="Travel"> Travel</label><label class="check"><input type="checkbox" name="interest" value="Nature"> Nature</label><label class="check"><input type="checkbox" name="interest" value="Books"> Books</label><label class="check"><input type="checkbox" name="interest" value="Food"> Food</label><label class="check"><input type="checkbox" name="interest" value="Fitness"> Fitness</label><label class="check"><input type="checkbox" name="interest" value="Movies"> Movies</label><label class="check"><input type="checkbox" name="interest" value="Learning"> Learning</label></div></div>
+      <div class="field"><label for="bio">A little about you</label><textarea id="bio" maxlength="500" rows="5" placeholder="What makes a good conversation with you?"></textarea><small class="field-help">Keep it warm and avoid sharing phone numbers or private contact details.</small></div>
+      <div class="privacy-toggle"><div><strong>Show me in Discover</strong><span>People can find you for anonymous conversations.</span></div><label class="switch"><input id="discoveryEnabled" type="checkbox" checked><span></span></label></div>
+      <p id="status" class="muted status-text"></p>
+      <button class="btn dark full" type="submit" id="saveBtn">Save &amp; continue →</button>
+    </form>
+  </div>
+</section>
+<aside class="privacy-card"><span class="lock">🔒</span><h2>You control your reveal.</h2><p>Your full profile is not shared with people you chat with. It becomes visible only after both people approve a connection.</p><div class="privacy-list"><span>✓ Your photo stays hidden</span><span>✓ Your display name stays hidden</span><span>✓ You can block or report</span></div><a href="safety.html">Read our safety principles →</a></aside>
+</main>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script><script src="supabase-config.js"></script><script src="auth.js"></script>
+<script>
+(async function(){
+  const auth=window.UncoverAuth; const status=document.getElementById('status');
+  const user=await auth.getUser();
+  if(!user){location.href='login.html';return;}
+  const sb=auth.getClient();
+  const {data,error}=await sb.from('profiles').select('*').eq('id',user.id).maybeSingle();
+  if(error){status.textContent='Could not load your profile: '+error.message;return;}
+  if(data){
+    document.getElementById('pageTitle').textContent=data.is_profile_complete?'Your profile':'Create your profile';
+    document.getElementById('displayName').value=data.display_name||user.user_metadata?.display_name||'';
+    document.getElementById('birthDate').value=data.birth_date||'';
+    document.getElementById('gender').value=data.gender||'';
+    document.getElementById('location').value=data.location||'';
+    document.getElementById('bio').value=data.bio||'';
+    document.getElementById('discoveryEnabled').checked=data.discovery_enabled!==false;
+    (data.looking_for||[]).forEach(v=>{const x=document.querySelector('input[name="looking"][value="'+CSS.escape(v)+'"]');if(x)x.checked=true;});
+    (data.interests||[]).forEach(v=>{const x=document.querySelector('input[name="interest"][value="'+CSS.escape(v)+'"]');if(x)x.checked=true;});
+    const initial=(data.display_name||'U').trim().charAt(0).toUpperCase();document.getElementById('avatarInitial').textContent=initial||'U';
+  }
+  document.getElementById('profileForm').addEventListener('submit',async(e)=>{
+    e.preventDefault(); status.textContent='Saving your private profile…';
+    const dob=document.getElementById('birthDate').value;
+    if(!dob){status.textContent='Please enter your date of birth.';return;}
+    const birth=new Date(dob+'T00:00:00'); const now=new Date(); let age=now.getFullYear()-birth.getFullYear(); const md=now.getMonth()-birth.getMonth(); if(md<0||(md===0&&now.getDate()<birth.getDate())) age--;
+    if(age<18){status.textContent='Uncover is for adults 18 and over.';return;}
+    if(age>100){status.textContent='Please check your date of birth.';return;}
+    const interests=[...document.querySelectorAll('input[name="interest"]:checked')].map(x=>x.value);
+    const looking=[...document.querySelectorAll('input[name="looking"]:checked')].map(x=>x.value);
+    const payload={display_name:document.getElementById('displayName').value.trim(),birth_date:dob,age,gender:document.getElementById('gender').value||null,location:document.getElementById('location').value.trim()||null,bio:document.getElementById('bio').value.trim()||null,interests,looking_for:looking,discovery_enabled:document.getElementById('discoveryEnabled').checked,is_profile_complete:true,last_active_at:new Date().toISOString()};
+    if(!payload.display_name){status.textContent='Please choose a display name.';return;}
+    const {error:updateError}=await sb.from('profiles').update(payload).eq('id',user.id);
+    if(updateError){status.textContent='Could not save your profile: '+updateError.message;return;}
+    status.textContent='Profile saved. Welcome to Uncover.'; setTimeout(()=>location.href='app.html',500);
+  });
+})();
+</script></body></html>
