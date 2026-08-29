@@ -28,3 +28,7 @@ The publishable key is intended for browser use. Never add a Supabase secret/ser
 
 ## V7
 Fixed the Discover front-end renderer. It consumes the secure `discover_people` RPC, renders anonymous cards, and starts private chats through `start_private_chat` without exposing names or photos.
+
+
+## V8
+Added real chat loading, message sending, Supabase Realtime subscription, conversation membership verification, and fixed the Like button parameter mismatch.
