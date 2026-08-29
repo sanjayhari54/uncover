@@ -148,11 +148,22 @@
             });
             if (error) throw error;
 
-            const conversationId = data;
-            if (!conversationId) throw new Error('The conversation could not be created.');
+            // Supabase RPCs can return either a scalar UUID or a one-row object.
+            const conversationId = typeof data === 'string'
+              ? data
+              : (data?.id || data?.conversation_id || data?.conversationId);
 
-            window.location.href =
-              `chat.html?conversation=${encodeURIComponent(conversationId)}&user=${encodeURIComponent(userId)}`;
+            const uuidRe = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+            if (!conversationId || !uuidRe.test(String(conversationId))) {
+              console.error('Unexpected start_private_chat response:', data);
+              throw new Error('Uncover created the chat but did not receive a valid conversation ID. Please try again.');
+            }
+
+            // Use a relative URL so GitHub Pages paths are preserved.
+            const chatUrl = new URL('chat.html', window.location.href);
+            chatUrl.searchParams.set('conversation', conversationId);
+            chatUrl.searchParams.set('user', userId);
+            window.location.assign(chatUrl.href);
           } catch (err) {
             console.error('Start chat error:', err);
             chat.disabled = false;

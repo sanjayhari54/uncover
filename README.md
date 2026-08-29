@@ -32,3 +32,7 @@ Fixed the Discover front-end renderer. It consumes the secure `discover_people` 
 
 ## V8
 Added real chat loading, message sending, Supabase Realtime subscription, conversation membership verification, and fixed the Like button parameter mismatch.
+
+
+## V9
+Robust chat routing: validates the RPC conversation ID, constructs the chat URL with URLSearchParams, and recovers the newest conversation if the URL is missing or malformed.
