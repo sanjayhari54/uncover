@@ -45,3 +45,7 @@ Added the mutual approval and profile reveal flow:
 - Connections page loads states through `my_connections`.
 - Revealed profile data is loaded only through `get_revealed_profile`.
 - Pending connections remain anonymous.
+
+
+## V13
+Added Block, Report, and notification UI. Run `uncover-v13-security.sql` once in Supabase before deploying V13.

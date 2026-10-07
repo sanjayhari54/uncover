@@ -175,6 +175,43 @@
         });
       });
 
+      const blockBtn = $('#blockUserBtn');
+      const reportBtn = $('#reportUserBtn');
+
+      if (blockBtn) blockBtn.addEventListener('click', async () => {
+        if (!confirm('Block this person? You will no longer discover or chat with each other.')) return;
+        blockBtn.disabled = true;
+        try {
+          const { error } = await sb.rpc('block_user', { p_other_user: otherUserId });
+          if (error) throw error;
+          alert('This person has been blocked.');
+          location.href = 'app.html';
+        } catch (err) {
+          console.error('Block error:', err);
+          alert(err?.message || 'Could not block this person.');
+          blockBtn.disabled = false;
+        }
+      });
+
+      if (reportBtn) reportBtn.addEventListener('click', async () => {
+        const reason = prompt('Why are you reporting this person?');
+        if (!reason || !reason.trim()) return;
+        reportBtn.disabled = true;
+        try {
+          const { error } = await sb.rpc('report_user', {
+            p_other_user: otherUserId,
+            p_reason: reason.trim().slice(0, 500)
+          });
+          if (error) throw error;
+          alert('Thank you. Your report has been submitted.');
+        } catch (err) {
+          console.error('Report error:', err);
+          alert(err?.message || 'Could not submit the report.');
+        } finally {
+          reportBtn.disabled = false;
+        }
+      });
+
       window.addEventListener('beforeunload', () => {
         try { sb.removeChannel(channel); } catch (_) {}
       });

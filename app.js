@@ -65,6 +65,41 @@
   }
 
 
+  async function loadNotifications() {
+    const section = $('#notificationSection');
+    const list = $('#notificationList');
+    if (!section || !list || !window.UncoverAuth) return;
+    try {
+      const user = await window.UncoverAuth.getUser();
+      if (!user) return;
+      const sb = window.UncoverAuth.getClient();
+      const { data, error } = await sb.rpc('my_notifications', { p_limit: 20 });
+      if (error) throw error;
+      const rows = Array.isArray(data) ? data : [];
+      if (!rows.length) { section.hidden = true; return; }
+      section.hidden = false;
+      list.innerHTML = rows.map(n => {
+        const title = n.kind === 'message' ? 'New private message' :
+          n.kind === 'connection' ? 'Connection update' : 'Safety update';
+        const text = n.kind === 'message' ? 'Someone sent you a message.' :
+          n.kind === 'connection' ? 'Someone approved your connection.' :
+          'Your safety action was completed.';
+        const when = n.created_at ? new Date(n.created_at).toLocaleString() : '';
+        const action = n.conversation_id
+          ? `<a class="btn dark" href="chat.html?conversation=${encodeURIComponent(n.conversation_id)}&user=${encodeURIComponent(n.other_user_id || '')}">Open chat →</a>`
+          : (n.kind === 'connection' ? '<a class="btn dark" href="connections.html">View connections →</a>' : '');
+        return `<article class="discover-card" style="margin-bottom:12px;">
+          <div class="discover-avatar" aria-hidden="true">!</div>
+          <div class="discover-content"><p class="eyebrow">${escapeHtml(title)}</p>
+          <h2>${escapeHtml(text)}</h2><p class="muted">${escapeHtml(when)}</p>
+          <div class="discover-actions">${action}</div></div></article>`;
+      }).join('');
+    } catch (err) {
+      console.warn('Could not load notifications:', err);
+      section.hidden = true;
+    }
+  }
+
   async function loadChats() {
     const list = $('#chatList');
     const section = $('#chatSection');
@@ -277,6 +312,7 @@
 
   document.addEventListener('DOMContentLoaded', () => {
     if ($('#discoverList')) {
+      loadNotifications();
       loadChats();
       loadDiscover();
       loadUsage();
