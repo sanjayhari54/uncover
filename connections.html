@@ -32,12 +32,37 @@
         if (!profile) continue;
         const initials = (profile.display_name || 'U').trim().charAt(0).toUpperCase() || 'U';
         const interests = arr(profile.interests).map(x=>'<span class="tag">'+escapeHtml(x)+'</span>').join('');
-        cards.push('<article class="discover-card connection-card"><div class="discover-avatar" aria-hidden="true">'+escapeHtml(initials)+'</div><div class="discover-content"><p class="eyebrow">CONNECTED</p><h2>'+escapeHtml(profile.display_name || 'Connection')+'</h2><p class="muted">'+escapeHtml(profile.age || '')+(profile.location?' · '+escapeHtml(profile.location):'')+'</p><p class="discover-bio">'+escapeHtml(profile.bio || 'You both chose to uncover more about each other.')+'</p><div class="tags">'+interests+'</div><div class="discover-actions"><a class="btn dark" href="chat.html?conversation='+encodeURIComponent('')+'&user='+encodeURIComponent(r.other_user_id)+'">Continue chat →</a></div></div></article>');
+        cards.push('<article class="discover-card connection-card"><div class="discover-avatar" aria-hidden="true">'+escapeHtml(initials)+'</div><div class="discover-content"><p class="eyebrow">CONNECTED</p><h2>'+escapeHtml(profile.display_name || 'Connection')+'</h2><p class="muted">'+escapeHtml(profile.age || '')+(profile.location?' · '+escapeHtml(profile.location):'')+'</p><p class="discover-bio">'+escapeHtml(profile.bio || 'You both chose to uncover more about each other.')+'</p><div class="tags">'+interests+'</div><div class="discover-actions"><a class="btn dark" href="chat.html?conversation='+encodeURIComponent('')+'&user='+encodeURIComponent(r.other_user_id)+'">Continue chat →</a><button class="btn safety-menu-btn" type="button" data-block="'+escapeHtml(r.other_user_id)+'">🚫 Block</button><button class="btn safety-menu-btn" type="button" data-report="'+escapeHtml(r.other_user_id)+'">⚠ Report</button></div></div></article>');
       }
       if (pending.length) {
         cards.push('<div class="loading-card"><strong>Waiting for mutual approval</strong><span class="muted">'+pending.length+' connection'+(pending.length===1?' is':'s are')+' still private. Profiles remain hidden until both people approve.</span></div>');
       }
       list.innerHTML = cards.join('') || '<div class="loading-card">No revealed profiles yet.</div>';
+      list.querySelectorAll('[data-block]').forEach(btn => btn.addEventListener('click', async () => {
+        if (!confirm('Block this person? You will no longer discover or chat with each other.')) return;
+        btn.disabled = true;
+        try {
+          const {error} = await sb.rpc('block_user', {p_other_user: btn.dataset.block});
+          if (error) throw error;
+          alert('This person has been blocked.');
+          location.reload();
+        } catch (err) {
+          alert(err?.message || 'Could not block this person.');
+          btn.disabled = false;
+        }
+      }));
+      list.querySelectorAll('[data-report]').forEach(btn => btn.addEventListener('click', async () => {
+        const reason = prompt('Why are you reporting this person?');
+        if (!reason || !reason.trim()) return;
+        btn.disabled = true;
+        try {
+          const {error} = await sb.rpc('report_user', {p_other_user: btn.dataset.report, p_reason: reason.trim().slice(0,500)});
+          if (error) throw error;
+          alert('Thank you. Your report has been submitted.');
+        } catch (err) {
+          alert(err?.message || 'Could not submit the report.');
+        } finally { btn.disabled = false; }
+      }));
     } catch(err) {
       console.error('Connections error:',err);
       list.innerHTML = '<div class="loading-card"><strong>Could not load connections.</strong><span class="muted">'+escapeHtml(err?.message || 'Please refresh and try again.')+'</span></div>';
