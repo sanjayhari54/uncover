@@ -36,3 +36,12 @@ Added real chat loading, message sending, Supabase Realtime subscription, conver
 
 ## V9
 Robust chat routing: validates the RPC conversation ID, constructs the chat URL with URLSearchParams, and recovers the newest conversation if the URL is missing or malformed.
+
+
+## V12
+Added the mutual approval and profile reveal flow:
+- Chat like/approve uses `approve_connection`.
+- Both approvals reveal the connection.
+- Connections page loads states through `my_connections`.
+- Revealed profile data is loaded only through `get_revealed_profile`.
+- Pending connections remain anonymous.

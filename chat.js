@@ -161,9 +161,10 @@
             const { data, error } = await sb.rpc('approve_connection', { p_other_user: otherUserId });
             if (error) throw error;
             if (data === true) {
+              alert('It’s a match! Both of you approved. The profile is now revealed.');
               location.href = 'connections.html';
             } else {
-              alert('Your approval has been recorded. The profile stays hidden until the other person approves too.');
+              alert('Your approval has been recorded. Your profile stays hidden until the other person approves too.');
             }
           } catch (err) {
             console.error('Connection error:', err);
