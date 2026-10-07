@@ -64,6 +64,70 @@
       </article>`;
   }
 
+
+  async function loadChats() {
+    const list = $('#chatList');
+    const section = $('#chatSection');
+    if (!list || !section || !window.UncoverAuth) return;
+
+    try {
+      const user = await window.UncoverAuth.getUser();
+      if (!user) return;
+      const sb = window.UncoverAuth.getClient();
+
+      const { data, error } = await sb
+        .from('conversations')
+        .select('id,user_a,user_b,status,created_at')
+        .or(`user_a.eq.${user.id},user_b.eq.${user.id}`)
+        .eq('status', 'active')
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+
+      if (!data?.length) {
+        section.hidden = true;
+        return;
+      }
+
+      section.hidden = false;
+      list.innerHTML = data.map(c => {
+        const other = c.user_a === user.id ? c.user_b : c.user_a;
+        return `
+          <article class="discover-card" style="margin-bottom:12px;">
+            <div class="discover-avatar" aria-hidden="true">?</div>
+            <div class="discover-content">
+              <div class="discover-top">
+                <div>
+                  <p class="eyebrow">PRIVATE CHAT</p>
+                  <h2>Someone you're talking to</h2>
+                  <p class="muted">Your identity is still hidden.</p>
+                </div>
+              </div>
+              <div class="discover-actions">
+                <button class="btn dark" type="button"
+                  data-open-chat="${escapeHtml(c.id)}"
+                  data-other-user="${escapeHtml(other)}">
+                  Continue private chat →
+                </button>
+              </div>
+            </div>
+          </article>`;
+      }).join('');
+
+      list.querySelectorAll('[data-open-chat]').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const chatUrl = new URL('chat.html', window.location.href);
+          chatUrl.searchParams.set('conversation', btn.dataset.openChat);
+          chatUrl.searchParams.set('user', btn.dataset.otherUser);
+          window.location.assign(chatUrl.href);
+        });
+      });
+    } catch (err) {
+      console.error('Could not load private chats:', err);
+      section.hidden = true;
+    }
+  }
+
   async function loadDiscover() {
     const list = $('#discoverList');
     const empty = $('#discoverEmpty');
@@ -213,6 +277,7 @@
 
   document.addEventListener('DOMContentLoaded', () => {
     if ($('#discoverList')) {
+      loadChats();
       loadDiscover();
       loadUsage();
     }
