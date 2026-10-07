@@ -21,7 +21,7 @@
       ? new Date(m.created_at).toLocaleTimeString([], {hour:'numeric', minute:'2-digit'})
       : '';
     return `<div class="msg${mine ? ' me' : ''}" data-message-id="${escapeHtml(m.id)}">
-      <div class="msg-body">${escapeHtml(m.content ?? m.body ?? '')}</div>
+      <div class="msg-body">${escapeHtml(m.message ?? '')}</div>
       <small class="msg-time">${escapeHtml(time)}</small>
     </div>`;
   }
@@ -89,7 +89,7 @@
       async function loadMessages() {
         const { data, error } = await sb
           .from('messages')
-          .select('id,conversation_id,sender_id,content,created_at')
+          .select('id,conversation_id,sender_id,message,created_at')
           .eq('conversation_id', conversationId)
           .order('created_at', { ascending: true });
 
@@ -132,8 +132,8 @@
         try {
           const { data, error } = await sb
             .from('messages')
-            .insert({ conversation_id: conversationId, sender_id: me, content })
-            .select('id,conversation_id,sender_id,content,created_at')
+            .insert({ conversation_id: conversationId, sender_id: me, message: content })
+            .select('id,conversation_id,sender_id,message,created_at')
             .single();
 
           if (error) throw error;
