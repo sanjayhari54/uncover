@@ -124,6 +124,21 @@
         return;
       }
 
+      // Sort chats by most recent message, so an active/older conversation
+      // moves to the top when someone sends a new message.
+      const ids = data.map(c => c.id);
+      const { data: recentMessages, error: messagesError } = await sb
+        .from('messages')
+        .select('conversation_id,created_at')
+        .in('conversation_id', ids)
+        .order('created_at', { ascending: false });
+      if (messagesError) throw messagesError;
+      const lastActivity = new Map();
+      for (const m of (recentMessages || [])) {
+        if (!lastActivity.has(m.conversation_id)) lastActivity.set(m.conversation_id, m.created_at);
+      }
+      data.sort((a, b) => new Date(lastActivity.get(b.id) || b.created_at) - new Date(lastActivity.get(a.id) || a.created_at));
+
       section.hidden = false;
       list.innerHTML = data.map(c => {
         const other = c.user_a === user.id ? c.user_b : c.user_a;

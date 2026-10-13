@@ -36,6 +36,21 @@ create policy "users read own notifications" on public.notifications
 for select to authenticated
 using (user_id = auth.uid());
 
+-- Ensure the block table exists before the block_user function uses it.
+create table if not exists public.blocks (
+  id uuid primary key default gen_random_uuid(),
+  blocker_id uuid not null references auth.users(id) on delete cascade,
+  blocked_id uuid not null references auth.users(id) on delete cascade,
+  created_at timestamptz not null default now(),
+  constraint blocks_no_self_block check (blocker_id <> blocked_id),
+  constraint blocks_unique_pair unique (blocker_id, blocked_id)
+);
+create index if not exists blocks_blocked_idx on public.blocks(blocked_id);
+alter table public.blocks enable row level security;
+drop policy if exists "users can read own blocks" on public.blocks;
+create policy "users can read own blocks" on public.blocks
+  for select to authenticated using (blocker_id = auth.uid() or blocked_id = auth.uid());
+
 create or replace function public.block_user(p_other_user uuid)
 returns boolean
 language plpgsql
@@ -154,3 +169,24 @@ drop trigger if exists trg_uncover_connection_notification on public.connection_
 create trigger trg_uncover_connection_notification
 after update of revealed on public.connection_requests
 for each row execute function public.notify_connection_reveal();
+
+
+-- Prevent new messages when either participant has blocked the other.
+create or replace function public.prevent_messages_between_blocked_users()
+returns trigger language plpgsql security definer set search_path=public as $$
+declare
+  recipient uuid;
+begin
+  select case when c.user_a = new.sender_id then c.user_b else c.user_a end
+    into recipient from public.conversations c where c.id = new.conversation_id;
+  if recipient is null then raise exception 'Conversation not found.'; end if;
+  if exists (select 1 from public.blocks b
+    where (b.blocker_id = new.sender_id and b.blocked_id = recipient)
+       or (b.blocker_id = recipient and b.blocked_id = new.sender_id)) then
+    raise exception 'This conversation is unavailable because one participant has blocked the other.';
+  end if;
+  return new;
+end; $$;
+drop trigger if exists trg_prevent_blocked_messages on public.messages;
+create trigger trg_prevent_blocked_messages before insert on public.messages
+for each row execute function public.prevent_messages_between_blocked_users();
