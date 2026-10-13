@@ -26,7 +26,7 @@
       const blockedCount = blockedIds.size;
       if (blockedSection && blockedList) {
         blockedSection.hidden = blockedCount === 0;
-        blockedList.innerHTML = blockedCount ? `<article class="chat-row"><div class="chat-orb">×</div><div class="chat-row-copy"><h3>${blockedCount} blocked ${blockedCount===1?'person':'people'}</h3><p>Separated from active connections and chats.</p></div></article>` : '';
+        blockedList.innerHTML = Array.from(blockedIds).map(() => `<article class="chat-row blocked"><div class="chat-orb">×</div><div class="chat-row-copy"><h3>Blocked member</h3><p>Chat closed · profile hidden · separated from connections</p></div><span class="muted" style="font-size:12px">Blocked</span></article>`).join('');
       }
       const visibleRows = rows.filter(r => !blockedIds.has(r.other_user_id));
       if (!visibleRows.length) {
@@ -43,7 +43,7 @@
         if (!profile) continue;
         const initials = (profile.display_name || 'U').trim().charAt(0).toUpperCase() || 'U';
         const interests = arr(profile.interests).map(x=>'<span class="tag">'+escapeHtml(x)+'</span>').join('');
-        cards.push('<article class="discover-card connection-card"><div class="discover-avatar" aria-hidden="true">'+escapeHtml(initials)+'</div><div class="discover-content"><p class="eyebrow">CONNECTED</p><h2>'+escapeHtml(profile.display_name || 'Connection')+'</h2><p class="muted">'+escapeHtml(profile.age || '')+(profile.location?' · '+escapeHtml(profile.location):'')+'</p><p class="discover-bio">'+escapeHtml(profile.bio || 'You both chose to uncover more about each other.')+'</p><div class="tags">'+interests+'</div><div class="discover-actions"><a class="btn dark" href="chat.html?conversation='+encodeURIComponent('')+'&user='+encodeURIComponent(r.other_user_id)+'">Continue chat →</a><button class="btn safety-menu-btn" type="button" data-block="'+escapeHtml(r.other_user_id)+'">🚫 Block</button><button class="btn safety-menu-btn" type="button" data-report="'+escapeHtml(r.other_user_id)+'">⚠ Report</button></div></div></article>');
+        cards.push('<article class="discover-card connection-card"><div class="discover-avatar" aria-hidden="true">'+escapeHtml(initials)+'</div><div class="discover-content"><p class="eyebrow">CONNECTED</p><h2>'+escapeHtml(profile.display_name || 'Connection')+'</h2><p class="muted">'+escapeHtml(profile.age || '')+(profile.location?' · '+escapeHtml(profile.location):'')+'</p><p class="discover-bio">'+escapeHtml(profile.bio || 'You both chose to uncover more about each other.')+'</p><div class="tags">'+interests+'</div><div class="discover-actions"><a class="btn dark" href="chat.html?user='+encodeURIComponent(r.other_user_id)+'">Continue chat →</a><button class="btn safety-menu-btn" type="button" data-block="'+escapeHtml(r.other_user_id)+'">🚫 Block</button><button class="btn safety-menu-btn" type="button" data-report="'+escapeHtml(r.other_user_id)+'">⚠ Report</button></div></div></article>');
       }
       if (pending.length) {
         cards.push('<div class="loading-card"><strong>Waiting for mutual approval</strong><span class="muted">'+pending.length+' connection'+(pending.length===1?' is':'s are')+' still private. Profiles remain hidden until both people approve.</span></div>');

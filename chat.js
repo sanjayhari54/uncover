@@ -26,51 +26,96 @@
     </div>`;
   }
 
+
+  function showInboxMode() {
+    const inbox = $('#chatInbox'); const view = $('#chatConversationView');
+    if (inbox) inbox.hidden = false;
+    if (view) view.hidden = true;
+  }
+  function showConversationMode() {
+    const inbox = $('#chatInbox'); const view = $('#chatConversationView');
+    if (inbox) inbox.hidden = true;
+    if (view) view.hidden = false;
+  }
+  async function renderInbox(sb, me) {
+    showInboxMode();
+    const activeList = $('#chatInboxActive');
+    const blockedSection = $('#chatInboxBlockedSection');
+    const blockedList = $('#chatInboxBlocked');
+    if (!activeList) return;
+    activeList.innerHTML = '<div class="loading-card">Loading your conversations…</div>';
+    try {
+      const { data: rows, error } = await sb.from('conversations')
+        .select('id,user_a,user_b,status,created_at')
+        .or(`user_a.eq.${me},user_b.eq.${me}`)
+        .order('created_at', { ascending: false });
+      if (error) throw error;
+      const { data: blockRows, error: blockError } = await sb.from('blocks')
+        .select('blocker_id,blocked_id').or(`blocker_id.eq.${me},blocked_id.eq.${me}`);
+      if (blockError) throw blockError;
+      const blockedIds = new Set((blockRows || []).map(b => b.blocker_id === me ? b.blocked_id : b.blocker_id));
+      const all = rows || [];
+      const lastByConversation = new Map();
+      if (all.length) {
+        const { data: msgs, error: msgError } = await sb.from('messages')
+          .select('conversation_id,message,sender_id,created_at')
+          .in('conversation_id', all.map(c => c.id)).order('created_at', { ascending: false });
+        if (msgError) throw msgError;
+        for (const m of (msgs || [])) if (!lastByConversation.has(m.conversation_id)) lastByConversation.set(m.conversation_id, m);
+      }
+      const other = c => c.user_a === me ? c.user_b : c.user_a;
+      const activity = c => lastByConversation.get(c.id)?.created_at || c.created_at;
+      all.sort((a,b) => new Date(activity(b)) - new Date(activity(a)));
+      const dedupe = arr => { const seen = new Set(); return arr.filter(c => { const id=other(c); if (!id || seen.has(id)) return false; seen.add(id); return true; }); };
+      const active = dedupe(all.filter(c => c.status === 'active' && !blockedIds.has(other(c))));
+      const blocked = dedupe(all.filter(c => blockedIds.has(other(c))));
+      const row = (c, isBlocked=false) => {
+        const msg = lastByConversation.get(c.id);
+        const snippet = isBlocked ? 'Conversation closed · blocked' : (msg ? ((msg.sender_id === me ? 'You: ' : '') + String(msg.message || '').slice(0,85)) : 'Start the conversation with a thoughtful hello.');
+        const when = activity(c) ? new Date(activity(c)).toLocaleDateString([], {month:'short',day:'numeric'}) : '';
+        return `<article class="chat-inbox-row${isBlocked?' blocked':''}"><div class="chat-orb" aria-hidden="true">${isBlocked?'×':'?'}</div><div class="chat-row-copy"><h3>${isBlocked?'Blocked conversation':'Anonymous conversation'}</h3><p>${escapeHtml(snippet)}</p></div><span class="chat-row-time">${escapeHtml(when)}</span>${isBlocked?'<span class="muted" style="font-size:12px">Closed</span>':`<button class="btn dark" type="button" data-inbox-open="${escapeHtml(c.id)}" data-inbox-user="${escapeHtml(other(c))}">Open →</button>`}</article>`;
+      };
+      activeList.innerHTML = active.map(c => row(c)).join('') || '<div class="chat-inbox-empty">No active chats yet. Start a private conversation from Discover.</div>';
+      activeList.querySelectorAll('[data-inbox-open]').forEach(btn => btn.addEventListener('click', () => {
+        const url = new URL('chat.html', location.href); url.searchParams.set('conversation',btn.dataset.inboxOpen); url.searchParams.set('user',btn.dataset.inboxUser); location.href=url.href;
+      }));
+      if (blockedSection && blockedList) {
+        blockedSection.hidden = !blocked.length;
+        blockedList.innerHTML = blocked.map(c => row(c,true)).join('');
+      }
+    } catch (err) {
+      console.error('Chat inbox error:', err);
+      activeList.innerHTML = `<div class="loading-card"><strong>Could not load chats.</strong><span class="muted">${escapeHtml(err?.message || 'Refresh and try again.')}</span></div>`;
+    }
+  }
+
   async function boot() {
     const list = $('#messages');
     const form = $('#chatForm');
     const input = $('#messageInput');
-    if (!list || !form || !input) return;
-
     try {
       const auth = window.UncoverAuth;
       if (!auth?.getClient) throw new Error('Authentication is not available.');
-
       const user = await auth.getUser();
-      if (!user) {
-        location.href = 'login.html';
-        return;
-      }
-
+      if (!user) { location.href = 'login.html'; return; }
       const sb = auth.getClient();
       const me = user.id;
 
-      // Recover a missing/invalid URL by finding the user's newest conversation.
+      // No conversation in the URL means show the inbox, not an arbitrary latest chat.
       if (!conversationId || !UUID.test(conversationId)) {
-        const { data: recent, error } = await sb
-          .from('conversations')
-          .select('id,user_a,user_b,status,created_at')
-          .or(`user_a.eq.${me},user_b.eq.${me}`)
-          .order('created_at', { ascending: false })
-          .limit(1);
-
-        if (error) throw error;
-        const latest = recent?.[0];
-
-        if (!latest) {
-          list.innerHTML = '<div class="loading-card"><strong>No private chat found.</strong><span class="muted">Return to Discover and start a new conversation.</span></div>';
-          form.style.display = 'none';
-          return;
-        }
-
-        conversationId = latest.id;
-        otherUserId = latest.user_a === me ? latest.user_b : latest.user_a;
-
-        const recovered = new URL('chat.html', location.href);
-        recovered.searchParams.set('conversation', conversationId);
-        recovered.searchParams.set('user', otherUserId);
-        history.replaceState({}, '', recovered.href);
+        if (otherUserId && UUID.test(otherUserId)) {
+          const { data: ownRows, error: ownError } = await sb.from('conversations')
+            .select('id,user_a,user_b,status,created_at')
+            .or(`user_a.eq.${me},user_b.eq.${me}`)
+            .eq('status','active').order('created_at',{ascending:false});
+          if (ownError) throw ownError;
+          const match = (ownRows || []).find(c => (c.user_a === me ? c.user_b : c.user_a) === otherUserId);
+          if (match) conversationId = match.id;
+          else { await renderInbox(sb, me); return; }
+        } else { await renderInbox(sb, me); return; }
       }
+      showConversationMode();
+      if (!list || !form || !input) return;
 
       // A block must close the chat view for both people, not merely reject sends.
       const { data: blockRows, error: blockCheckError } = await sb
