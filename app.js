@@ -153,8 +153,19 @@
       }
       visibleData.sort((a, b) => new Date(lastActivity.get(b.id) || b.created_at) - new Date(lastActivity.get(a.id) || a.created_at));
 
+      // Show only one dashboard card per person. Older duplicate conversation
+      // rows for the same pair can exist from earlier chat starts; keep the
+      // most recently active conversation (the list is already sorted above).
+      const seenPeople = new Set();
+      const uniqueChats = visibleData.filter(c => {
+        const otherId = c.user_a === user.id ? c.user_b : c.user_a;
+        if (!otherId || seenPeople.has(otherId)) return false;
+        seenPeople.add(otherId);
+        return true;
+      });
+
       section.hidden = false;
-      list.innerHTML = visibleData.map(c => {
+      list.innerHTML = uniqueChats.map(c => {
         const other = c.user_a === user.id ? c.user_b : c.user_a;
         return `
           <article class="discover-card" style="margin-bottom:12px;">
