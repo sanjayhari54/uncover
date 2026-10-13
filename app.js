@@ -124,9 +124,23 @@
         return;
       }
 
+      // Hide chats involving anyone either side has blocked.
+      const { data: blockRows, error: blockError } = await sb
+        .from('blocks')
+        .select('blocker_id,blocked_id')
+        .or(`blocker_id.eq.${user.id},blocked_id.eq.${user.id}`);
+      if (blockError) throw blockError;
+      const blockedIds = new Set((blockRows || []).map(b => b.blocker_id === user.id ? b.blocked_id : b.blocker_id));
+      const visibleData = data.filter(c => !blockedIds.has(c.user_a === user.id ? c.user_b : c.user_a));
+      if (!visibleData.length) {
+        section.hidden = true;
+        list.innerHTML = '';
+        return;
+      }
+
       // Sort chats by most recent message, so an active/older conversation
       // moves to the top when someone sends a new message.
-      const ids = data.map(c => c.id);
+      const ids = visibleData.map(c => c.id);
       const { data: recentMessages, error: messagesError } = await sb
         .from('messages')
         .select('conversation_id,created_at')
@@ -137,10 +151,10 @@
       for (const m of (recentMessages || [])) {
         if (!lastActivity.has(m.conversation_id)) lastActivity.set(m.conversation_id, m.created_at);
       }
-      data.sort((a, b) => new Date(lastActivity.get(b.id) || b.created_at) - new Date(lastActivity.get(a.id) || a.created_at));
+      visibleData.sort((a, b) => new Date(lastActivity.get(b.id) || b.created_at) - new Date(lastActivity.get(a.id) || a.created_at));
 
       section.hidden = false;
-      list.innerHTML = data.map(c => {
+      list.innerHTML = visibleData.map(c => {
         const other = c.user_a === user.id ? c.user_b : c.user_a;
         return `
           <article class="discover-card" style="margin-bottom:12px;">
@@ -329,6 +343,14 @@
     if ($('#discoverList')) {
       loadNotifications();
       loadChats();
+      // Keep the chat list fresh while the dashboard is open; a new message
+      // re-sorts the active conversation to the top without a manual refresh.
+      try {
+        const sb = window.UncoverAuth?.getClient?.();
+        if (sb) sb.channel('uncover-dashboard-chat-order')
+          .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, () => loadChats())
+          .subscribe();
+      } catch (e) { console.warn('Live chat ordering unavailable:', e); }
       loadDiscover();
       loadUsage();
     }

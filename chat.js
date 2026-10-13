@@ -72,6 +72,20 @@
         history.replaceState({}, '', recovered.href);
       }
 
+      // A block must close the chat view for both people, not merely reject sends.
+      const { data: blockRows, error: blockCheckError } = await sb
+        .from('blocks')
+        .select('id')
+        .or(`and(blocker_id.eq.${me},blocked_id.eq.${otherUserId || '00000000-0000-0000-0000-000000000000'}),and(blocker_id.eq.${otherUserId || '00000000-0000-0000-0000-000000000000'},blocked_id.eq.${me})`)
+        .limit(1);
+      if (blockCheckError) console.warn('Could not pre-check block status:', blockCheckError);
+      if (blockRows?.length) {
+        list.innerHTML = '<div class="loading-card"><strong>This chat is unavailable.</strong><span class="muted">One of you has blocked the other. This conversation is closed.</span></div>';
+        form.style.display = 'none';
+        document.querySelectorAll('[data-like-connection], #reportUserBtn, #blockUserBtn').forEach(el => el.disabled = true);
+        return;
+      }
+
       // Verify membership.
       const { data: convo, error: convoError } = await sb
         .from('conversations')
@@ -86,6 +100,15 @@
 
       otherUserId = convo.user_a === me ? convo.user_b : convo.user_a;
 
+      function scrollMessagesToBottom() {
+        // Scroll the message pane itself and ensure the newest bubble is visible.
+        requestAnimationFrame(() => {
+          list.scrollTop = list.scrollHeight;
+          const last = list.querySelector('.msg:last-of-type');
+          if (last) last.scrollIntoView({ block: 'end', behavior: 'auto' });
+        });
+      }
+
       async function loadMessages() {
         const { data, error } = await sb
           .from('messages')
@@ -99,7 +122,7 @@
           list.innerHTML = '<div class="loading-card"><strong>Your private conversation starts here.</strong><span class="muted">Say hello and get to know each other.</span></div>';
         } else {
           list.innerHTML = data.map(m => messageHtml(m, me)).join('');
-          list.scrollTop = list.scrollHeight;
+          scrollMessagesToBottom();
         }
       }
 
@@ -116,7 +139,7 @@
           if (!m?.id || list.querySelector(`[data-message-id="${CSS.escape(String(m.id))}"]`)) return;
           list.querySelector('.loading-card')?.remove();
           list.insertAdjacentHTML('beforeend', messageHtml(m, me));
-          list.scrollTop = list.scrollHeight;
+          scrollMessagesToBottom();
         })
         .subscribe(status => console.log('Uncover chat realtime:', status));
 
@@ -142,7 +165,7 @@
           if (!list.querySelector(`[data-message-id="${CSS.escape(String(data.id))}"]`)) {
             list.insertAdjacentHTML('beforeend', messageHtml(data, me));
           }
-          list.scrollTop = list.scrollHeight;
+          scrollMessagesToBottom();
           input.value = '';
         } catch (err) {
           console.error('Uncover send message error:', err);
@@ -184,7 +207,11 @@
         try {
           const { error } = await sb.rpc('block_user', { p_other_user: otherUserId });
           if (error) throw error;
-          alert('This person has been blocked.');
+          // Clear the chat immediately so it cannot appear to remain active.
+          list.innerHTML = '<div class="loading-card"><strong>Chat blocked.</strong><span class="muted">This conversation is now closed.</span></div>';
+          form.style.display = 'none';
+          document.querySelectorAll('[data-like-connection], #reportUserBtn, #blockUserBtn').forEach(el => el.disabled = true);
+          alert('This person has been blocked. The conversation is closed.');
           location.href = 'app.html';
         } catch (err) {
           console.error('Block error:', err);
