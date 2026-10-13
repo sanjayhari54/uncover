@@ -103,103 +103,62 @@
   async function loadChats() {
     const list = $('#chatList');
     const section = $('#chatSection');
+    const blockedSection = $('#blockedChatSection');
+    const blockedList = $('#blockedChatList');
     if (!list || !section || !window.UncoverAuth) return;
-
     try {
       const user = await window.UncoverAuth.getUser();
       if (!user) return;
       const sb = window.UncoverAuth.getClient();
-
-      const { data, error } = await sb
-        .from('conversations')
+      const { data, error } = await sb.from('conversations')
         .select('id,user_a,user_b,status,created_at')
         .or(`user_a.eq.${user.id},user_b.eq.${user.id}`)
-        .eq('status', 'active')
-        .order('created_at', { ascending: false });
-
+        .eq('status', 'active').order('created_at', { ascending: false });
       if (error) throw error;
-
-      if (!data?.length) {
-        section.hidden = true;
-        return;
-      }
-
-      // Hide chats involving anyone either side has blocked.
-      const { data: blockRows, error: blockError } = await sb
-        .from('blocks')
-        .select('blocker_id,blocked_id')
-        .or(`blocker_id.eq.${user.id},blocked_id.eq.${user.id}`);
+      const { data: blockRows, error: blockError } = await sb.from('blocks')
+        .select('blocker_id,blocked_id').or(`blocker_id.eq.${user.id},blocked_id.eq.${user.id}`);
       if (blockError) throw blockError;
       const blockedIds = new Set((blockRows || []).map(b => b.blocker_id === user.id ? b.blocked_id : b.blocker_id));
-      const visibleData = data.filter(c => !blockedIds.has(c.user_a === user.id ? c.user_b : c.user_a));
-      if (!visibleData.length) {
-        section.hidden = true;
-        list.innerHTML = '';
-        return;
-      }
-
-      // Sort chats by most recent message, so an active/older conversation
-      // moves to the top when someone sends a new message.
-      const ids = visibleData.map(c => c.id);
-      const { data: recentMessages, error: messagesError } = await sb
-        .from('messages')
-        .select('conversation_id,created_at')
-        .in('conversation_id', ids)
-        .order('created_at', { ascending: false });
-      if (messagesError) throw messagesError;
+      const allChats = data || [];
+      const blockedChats = allChats.filter(c => blockedIds.has(c.user_a === user.id ? c.user_b : c.user_a));
+      const activeChats = allChats.filter(c => !blockedIds.has(c.user_a === user.id ? c.user_b : c.user_a));
+      const ids = allChats.map(c => c.id);
       const lastActivity = new Map();
-      for (const m of (recentMessages || [])) {
-        if (!lastActivity.has(m.conversation_id)) lastActivity.set(m.conversation_id, m.created_at);
+      if (ids.length) {
+        const { data: recentMessages, error: messagesError } = await sb.from('messages')
+          .select('conversation_id,created_at').in('conversation_id', ids).order('created_at', { ascending: false });
+        if (messagesError) throw messagesError;
+        for (const m of (recentMessages || [])) if (!lastActivity.has(m.conversation_id)) lastActivity.set(m.conversation_id, m.created_at);
       }
-      visibleData.sort((a, b) => new Date(lastActivity.get(b.id) || b.created_at) - new Date(lastActivity.get(a.id) || a.created_at));
-
-      // Show only one dashboard card per person. Older duplicate conversation
-      // rows for the same pair can exist from earlier chat starts; keep the
-      // most recently active conversation (the list is already sorted above).
-      const seenPeople = new Set();
-      const uniqueChats = visibleData.filter(c => {
-        const otherId = c.user_a === user.id ? c.user_b : c.user_a;
-        if (!otherId || seenPeople.has(otherId)) return false;
-        seenPeople.add(otherId);
-        return true;
-      });
-
-      section.hidden = false;
-      list.innerHTML = uniqueChats.map(c => {
+      const sorter = (a,b) => new Date(lastActivity.get(b.id) || b.created_at) - new Date(lastActivity.get(a.id) || a.created_at);
+      activeChats.sort(sorter); blockedChats.sort(sorter);
+      // Deduplicate by the other person's user ID, after sorting by latest message.
+      function uniqueByPerson(rows) {
+        const seen = new Set();
+        return rows.filter(c => { const other = c.user_a === user.id ? c.user_b : c.user_a; if (!other || seen.has(other)) return false; seen.add(other); return true; });
+      }
+      const uniqueActive = uniqueByPerson(activeChats);
+      const uniqueBlocked = uniqueByPerson(blockedChats);
+      const rowHtml = (c, blocked=false) => {
         const other = c.user_a === user.id ? c.user_b : c.user_a;
-        return `
-          <article class="discover-card" style="margin-bottom:12px;">
-            <div class="discover-avatar" aria-hidden="true">?</div>
-            <div class="discover-content">
-              <div class="discover-top">
-                <div>
-                  <p class="eyebrow">PRIVATE CHAT</p>
-                  <h2>Someone you're talking to</h2>
-                  <p class="muted">Your identity is still hidden.</p>
-                </div>
-              </div>
-              <div class="discover-actions">
-                <button class="btn dark" type="button"
-                  data-open-chat="${escapeHtml(c.id)}"
-                  data-other-user="${escapeHtml(other)}">
-                  Continue private chat →
-                </button>
-              </div>
-            </div>
-          </article>`;
-      }).join('');
-
-      list.querySelectorAll('[data-open-chat]').forEach(btn => {
-        btn.addEventListener('click', () => {
-          const chatUrl = new URL('chat.html', window.location.href);
-          chatUrl.searchParams.set('conversation', btn.dataset.openChat);
-          chatUrl.searchParams.set('user', btn.dataset.otherUser);
-          window.location.assign(chatUrl.href);
-        });
-      });
+        const activity = lastActivity.get(c.id) || c.created_at;
+        const stamp = activity ? new Date(activity).toLocaleDateString([], {month:'short',day:'numeric'}) : '';
+        return `<article class="chat-row${blocked?' blocked':''}"><div class="chat-orb" aria-hidden="true">${blocked?'×':'?'}</div><div class="chat-row-copy"><h3>${blocked?'Blocked conversation':'Someone you’re talking to'}</h3><p>${blocked?'Chat closed · blocked':('Private conversation · '+escapeHtml(stamp))}</p></div>${blocked?'<span class="muted" style="font-size:12px">Closed</span>':`<button class="btn dark" type="button" data-open-chat="${escapeHtml(c.id)}" data-other-user="${escapeHtml(other)}">Open chat →</button>`}</article>`;
+      };
+      section.hidden = !uniqueActive.length && !uniqueBlocked.length;
+      list.innerHTML = uniqueActive.map(c => rowHtml(c)).join('') || '<div class="loading-card">No active private chats yet.</div>';
+      if (blockedSection && blockedList) {
+        blockedSection.hidden = !uniqueBlocked.length;
+        blockedList.innerHTML = uniqueBlocked.map(c => rowHtml(c,true)).join('');
+      }
+      list.querySelectorAll('[data-open-chat]').forEach(btn => btn.addEventListener('click', () => {
+        const url = new URL('chat.html', window.location.href);
+        url.searchParams.set('conversation', btn.dataset.openChat); url.searchParams.set('user', btn.dataset.otherUser); window.location.assign(url.href);
+      }));
     } catch (err) {
       console.error('Could not load private chats:', err);
-      section.hidden = true;
+      section.hidden = false;
+      list.innerHTML = '<div class="loading-card"><strong>Could not load chats.</strong><span class="muted">Refresh the page and try again.</span></div>';
     }
   }
 

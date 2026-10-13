@@ -1,6 +1,6 @@
-<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Uncover — Connections</title><link rel="stylesheet" href="styles.css"></head><body class="app-page"><header class="app-nav"><a class="brand" href="index.html"><span class="brand-mark">○</span> Uncover</a><nav><a href="app.html">Discover</a><a href="chat.html">Chats</a><a class="active" href="connections.html">Connections</a><a href="profile.html">My Profile</a></nav><a class="avatar" href="profile.html">U</a></header>
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Uncover — Connections</title><link rel="stylesheet" href="styles.css"><style>.chat-rows{display:flex;flex-direction:column;gap:8px}.chat-row{display:flex;align-items:center;gap:12px;padding:12px 14px;border:1px solid #e7e5e4;border-radius:14px;background:#fff}.chat-orb{width:40px;height:40px;flex:0 0 40px;border-radius:50%;display:grid;place-items:center;background:#f1eee9;font-weight:700}.chat-row-copy{flex:1;min-width:0}.chat-row h3{font-size:15px;margin:0 0 3px}.chat-row p{font-size:12px;margin:0;color:#777}.blocked-section{margin-top:24px;padding-top:20px;border-top:1px solid #e7e5e4}</style></head><body class="app-page"><header class="app-nav"><a class="brand" href="index.html"><span class="brand-mark">○</span> Uncover</a><nav><a href="app.html">Discover</a><a href="chat.html">Chats</a><a class="active" href="connections.html">Connections</a><a href="profile.html">My Profile</a></nav><a class="avatar" href="profile.html">U</a></header>
 <main class="app-wrap"><div class="app-head"><div><p class="eyebrow">CONNECTIONS</p><h1>Your mutual moments.</h1><p class="muted">A profile is revealed only after both people approve.</p></div></div>
-<section id="connectionsList" class="connection-grid"><div class="loading-card">Loading your connections…</div></section></main>
+<section id="connectionsList" class="connection-grid"><div class="loading-card">Loading your connections…</div></section><section id="blockedConnectionsSection" class="blocked-section" hidden><p class="eyebrow">SAFETY</p><h2>Blocked people</h2><p class="muted">Blocked people are kept separate from your connections. Their profiles and chat actions are hidden here.</p><div id="blockedConnectionsList" class="chat-rows"></div></section></main>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script><script src="supabase-config.js"></script><script src="auth.js"></script>
 <script>
 (() => {
@@ -18,12 +18,23 @@
       const {data, error} = await sb.rpc('my_connections');
       if (error) throw error;
       const rows = Array.isArray(data) ? data : [];
-      if (!rows.length) {
+      const {data: blockRows, error: blockError} = await sb.from('blocks').select('blocker_id,blocked_id').or(`blocker_id.eq.${user.id},blocked_id.eq.${user.id}`);
+      if (blockError) throw blockError;
+      const blockedIds = new Set((blockRows || []).map(b => b.blocker_id === user.id ? b.blocked_id : b.blocker_id));
+      const blockedSection = $('#blockedConnectionsSection');
+      const blockedList = $('#blockedConnectionsList');
+      const blockedCount = blockedIds.size;
+      if (blockedSection && blockedList) {
+        blockedSection.hidden = blockedCount === 0;
+        blockedList.innerHTML = blockedCount ? `<article class="chat-row"><div class="chat-orb">×</div><div class="chat-row-copy"><h3>${blockedCount} blocked ${blockedCount===1?'person':'people'}</h3><p>Separated from active connections and chats.</p></div></article>` : '';
+      }
+      const visibleRows = rows.filter(r => !blockedIds.has(r.other_user_id));
+      if (!visibleRows.length) {
         list.innerHTML = '<div class="loading-card"><strong>No connections yet.</strong><span class="muted">Start a private conversation from Discover, then approve the connection when you are ready.</span><a class="btn dark" href="app.html">Discover people →</a></div>';
         return;
       }
-      const revealed = rows.filter(r => r.revealed);
-      const pending = rows.filter(r => !r.revealed);
+      const revealed = visibleRows.filter(r => r.revealed);
+      const pending = visibleRows.filter(r => !r.revealed);
       const cards = [];
       for (const r of revealed) {
         const {data:p, error:e} = await sb.rpc('get_revealed_profile',{p_other_user:r.other_user_id});

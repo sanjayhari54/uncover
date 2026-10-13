@@ -1,4 +1,6 @@
-<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Uncover — Discover</title><link rel="stylesheet" href="styles.css"></head><body class="app-page"><header class="app-nav"><a class="brand" href="index.html"><span class="brand-mark">○</span> Uncover</a><nav><a class="active" href="app.html">Discover</a><a href="chat.html">Chats</a><a href="connections.html">Connections</a><a href="profile.html">My Profile</a></nav><a class="avatar" href="profile.html">U</a></header><main class="app-wrap">
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Uncover — Discover</title><link rel="stylesheet" href="styles.css"><style>
+.chat-rows{display:flex;flex-direction:column;gap:8px}.chat-row{display:flex;align-items:center;gap:12px;padding:12px 14px;border:1px solid var(--line,#e7e5e4);border-radius:14px;background:var(--card,#fff);min-width:0}.chat-row .chat-orb{width:42px;height:42px;flex:0 0 42px;border-radius:50%;display:grid;place-items:center;background:#f1eee9;color:#49413a;font-weight:700}.chat-row .chat-row-copy{flex:1;min-width:0}.chat-row h3{font-size:15px;margin:0 0 3px}.chat-row p{font-size:12px;margin:0;color:var(--muted,#777);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.chat-row .btn{white-space:nowrap;padding:8px 12px;font-size:12px}.blocked-section{margin-top:22px;padding-top:18px;border-top:1px solid var(--line,#e7e5e4)}.blocked-heading h3{margin:0 0 4px}.chat-row.blocked{background:#f8f7f6}.chat-row.blocked .chat-orb{background:#e8e5e2;color:#777}@media(max-width:520px){.chat-row{padding:10px;gap:9px}.chat-row .chat-orb{width:36px;height:36px;flex-basis:36px}.chat-row .btn{padding:7px 9px}}
+</style></head><body class="app-page"><header class="app-nav"><a class="brand" href="index.html"><span class="brand-mark">○</span> Uncover</a><nav><a class="active" href="app.html">Discover</a><a href="chat.html">Chats</a><a href="connections.html">Connections</a><a href="profile.html">My Profile</a></nav><a class="avatar" href="profile.html">U</a></header><main class="app-wrap">
 <section id="notificationSection" class="app-section" hidden>
   <div class="app-head">
     <div>
@@ -16,6 +18,7 @@
       <p class="muted">Continue a conversation you've already started.</p>
     </div>
   </div>
-  <div id="chatList" class="discover-list"></div>
+  <div id="chatList" class="chat-rows"></div>
+  <div id="blockedChatSection" class="blocked-section" hidden><div class="blocked-heading"><div><p class="eyebrow">SAFETY</p><h3>Blocked chats</h3><p class="muted">These conversations are closed and cannot receive messages.</p></div></div><div id="blockedChatList" class="chat-rows"></div></div>
 </section>
 <section id="discoverList" class="discover-list"></section><div id="discoverEmpty" class="loading-card" hidden>No more anonymous conversations right now. Check back soon.</div><section class="privacy-strip"><strong>Why Uncover?</strong><span>Your name and photo stay hidden until both people approve.</span><a href="how-it-works.html">How it works →</a></section></main><script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script><script src="supabase-config.js"></script><script src="auth.js"></script><script src="app.js"></script></body></html>

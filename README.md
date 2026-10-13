@@ -1,51 +1,13 @@
-# Uncover V4 — Supabase-connected MVP
+# Uncover V18
 
-This version connects the static Uncover frontend to Supabase Auth and the `profiles` table.
+## Update
+1. Extract this ZIP.
+2. Upload/replace the included files in your existing GitHub repository and commit.
+3. Hard refresh the site with Ctrl+Shift+R.
 
-## Current real functionality
-- Email/password sign up
-- Email/password login
-- Auth guard for app pages
-- Automatic profile creation after login/session
-- Server-side free-chat counter display from `profiles`
-- Logout
-
-## Supabase project
-Configured for the Uncover Supabase project using the browser-safe publishable key.
-
-## Important
-The publishable key is intended for browser use. Never add a Supabase secret/service-role key to these files.
-
-## Before launch
-- Add production privacy policy and terms
-- Verify 18+ age controls and moderation
-- Implement server-side chat/usage enforcement
-- Add Storage rules for photos
-- Add real-time messaging
-- Add mutual approval/reveal RPCs with strict RLS
-- Connect a payment provider through a server/webhook flow
-
-
-## V7
-Fixed the Discover front-end renderer. It consumes the secure `discover_people` RPC, renders anonymous cards, and starts private chats through `start_private_chat` without exposing names or photos.
-
-
-## V8
-Added real chat loading, message sending, Supabase Realtime subscription, conversation membership verification, and fixed the Like button parameter mismatch.
-
-
-## V9
-Robust chat routing: validates the RPC conversation ID, constructs the chat URL with URLSearchParams, and recovers the newest conversation if the URL is missing or malformed.
-
-
-## V12
-Added the mutual approval and profile reveal flow:
-- Chat like/approve uses `approve_connection`.
-- Both approvals reveal the connection.
-- Connections page loads states through `my_connections`.
-- Revealed profile data is loaded only through `get_revealed_profile`.
-- Pending connections remain anonymous.
-
-
-## V13
-Added Block, Report, and notification UI. Run `uncover-v13-security.sql` once in Supabase before deploying V13.
+## Changes
+- Dashboard chat list is a compact, single-row-per-person layout.
+- Duplicate conversations are deduplicated by other user's ID, keeping the most recently active row.
+- Blocked conversations are shown in a separate, closed section and cannot be opened from the dashboard.
+- Blocked people are filtered out of normal Connections; a separate summary indicates how many people are blocked.
+- No new SQL is required; uses the existing `blocks` table.
