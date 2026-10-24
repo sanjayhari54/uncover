@@ -32,10 +32,9 @@
       location: draft.location || null,
       bio: draft.bio || null,
       interests: Array.isArray(draft.interests) ? draft.interests : [],
-      looking_for: Array.isArray(draft.looking_for) ? draft.looking_for : [],
-      free_chats_used: 0,
-      free_chats_limit: 3,
-      is_premium: false
+      looking_for: Array.isArray(draft.looking_for) ? draft.looking_for : []
+      // free_chats_used, free_chats_limit and is_premium come from database
+      // defaults and cannot be written from the browser.
     });
     localStorage.removeItem('uncover_profile_draft');
   }
@@ -47,7 +46,7 @@
     async signUp({ email, password, display_name }) {
       const sb = getClient();
       if (!sb) throw new Error('Supabase has not loaded yet. Refresh and try again.');
-      const { data, error } = await sb.auth.signUp({ email, password, options: { emailRedirectTo: window.location.origin + window.location.pathname.replace(/[^/]+$/, 'login.html') } });
+      const { data, error } = await sb.auth.signUp({ email, password, options: { emailRedirectTo: window.location.origin + window.location.pathname.replace(/[^/]+$/, 'login.html'), data: { accepted_terms_at: new Date().toISOString() } } });
       if (error) throw error;
       localStorage.setItem('uncover_profile_draft', JSON.stringify({ display_name }));
       if (data.user && data.session) await ensureProfile(data.user);

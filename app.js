@@ -185,6 +185,15 @@
       }
 
       const sb = auth.getClient();
+
+      // Members must finish their profile (including date of birth) before discovering people.
+      const { data: me } = await sb.from('profiles')
+        .select('is_profile_complete,birth_date').eq('id', user.id).maybeSingle();
+      if (!me || !me.is_profile_complete || !me.birth_date) {
+        window.location.href = 'profile.html';
+        return;
+      }
+
       const { data, error } = await sb.rpc('discover_people', { p_limit: 12 });
 
       if (error) throw error;
@@ -270,6 +279,8 @@
             const message = String(err?.message || '');
             if (message.includes('FREE_CHAT_LIMIT_REACHED')) {
               window.location.href = 'pricing.html';
+            } else if (message.includes('PROFILE_INCOMPLETE')) {
+              window.location.href = 'profile.html';
             } else {
               alert(message || 'Could not start the private conversation.');
             }
