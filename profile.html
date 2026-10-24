@@ -1,4 +1,9 @@
-<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Uncover — Create your profile</title><link rel="stylesheet" href="styles.css"></head><body class="app-page">
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Uncover — Create your profile</title><link rel="stylesheet" href="styles.css"><style>
+.photo-row{display:flex;align-items:center;gap:18px;flex-wrap:wrap}
+.photo-preview{width:96px;height:96px;border-radius:50%;background:#f1eee9 center/cover no-repeat;display:grid;place-items:center;font-weight:700;font-size:32px;color:#49413a;border:1px solid var(--line);flex:0 0 96px}
+.photo-actions{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:6px}
+.photo-actions .btn{padding:9px 16px;font-size:13px}
+</style></head><body class="app-page">
 <header class="app-nav"><a class="brand" href="index.html"><span class="brand-mark">○</span> Uncover</a><nav><a href="app.html">Discover</a><a href="chat.html">Chats</a><a href="connections.html">Connections</a><a class="active" href="profile.html">My Profile</a></nav><button class="avatar" data-signout title="Log out">U</button></header>
 <main class="profile-wrap profile-editor-wrap">
 <section class="profile-card profile-editor">
@@ -8,6 +13,7 @@
     <h1 id="pageTitle">Create your profile</h1>
     <p class="muted">Your name and photo stay private. Other people only see your full profile after you both approve the connection.</p>
     <form id="profileForm">
+      <div class="field"><label>Profile photo <span class="muted">(optional)</span></label><div class="photo-row"><div class="photo-preview" id="photoPreview" aria-hidden="true">U</div><div><div class="photo-actions"><input id="photoInput" type="file" accept="image/jpeg,image/png,image/webp" hidden><button type="button" class="btn outline" id="photoChoose">Choose photo</button><button type="button" class="btn outline" id="photoRemove" hidden>Remove</button></div><small class="field-help">Stays hidden until you both approve a connection. Use a clear photo of yourself. No nudity, and no photos of other people. JPG, PNG or WebP.</small></div></div></div>
       <div class="form-grid">
         <div class="field"><label for="displayName">Display name</label><input id="displayName" maxlength="40" required placeholder="How you'd like to be known"></div>
         <div class="field"><label for="birthDate">Date of birth</label><input id="birthDate" type="date" required><small class="field-help">You must be 18 or older.</small></div>
@@ -34,6 +40,36 @@
   const sb=auth.getClient();
   const {data,error}=await sb.from('profiles').select('*').eq('id',user.id).maybeSingle();
   if(error){status.textContent='Could not load your profile: '+error.message;return;}
+  let photoPath=null, pendingBlob=null, removePhoto=false;
+  const photoPreview=document.getElementById('photoPreview'), photoInput=document.getElementById('photoInput'), photoChoose=document.getElementById('photoChoose'), photoRemove=document.getElementById('photoRemove'), avatarEl=document.getElementById('avatarInitial');
+  function showPhoto(url){ [photoPreview,avatarEl].forEach(el=>{ if(!el)return; el.style.backgroundImage='url("'+url+'")'; el.style.backgroundSize='cover'; el.style.backgroundPosition='center'; el.style.color='transparent'; }); photoRemove.hidden=false; }
+  function clearPhoto(){ [photoPreview,avatarEl].forEach(el=>{ if(!el)return; el.style.backgroundImage=''; el.style.color=''; }); photoRemove.hidden=true; }
+  async function loadExistingPhoto(path){
+    if(!path) return; photoPath=path;
+    try{ const {data:signed}=await sb.storage.from('profile-photos').createSignedUrl(path,3600); if(signed&&signed.signedUrl) showPhoto(signed.signedUrl); }catch(_){}
+  }
+  async function processImage(file){
+    if(!/^image\/(jpeg|png|webp)$/.test(file.type)) throw new Error('Please choose a JPG, PNG or WebP image.');
+    if(file.size>10*1024*1024) throw new Error('That image is too large. Please choose one under 10 MB.');
+    const url=URL.createObjectURL(file);
+    try{
+      const img=await new Promise((res,rej)=>{const i=new Image();i.onload=()=>res(i);i.onerror=()=>rej(new Error('Could not read that image.'));i.src=url;});
+      const scale=Math.min(1,900/Math.max(img.width,img.height));
+      const c=document.createElement('canvas'); c.width=Math.max(1,Math.round(img.width*scale)); c.height=Math.max(1,Math.round(img.height*scale));
+      c.getContext('2d').drawImage(img,0,0,c.width,c.height);
+      const blob=await new Promise(r=>c.toBlob(r,'image/jpeg',0.85));
+      if(!blob) throw new Error('Could not prepare that image.');
+      return blob; // re-encoded as JPEG: smaller file, and hidden metadata such as GPS location is removed
+    } finally { URL.revokeObjectURL(url); }
+  }
+  photoChoose.addEventListener('click',()=>photoInput.click());
+  photoInput.addEventListener('change',async()=>{
+    const file=photoInput.files&&photoInput.files[0]; if(!file) return;
+    try{ pendingBlob=await processImage(file); removePhoto=false; showPhoto(URL.createObjectURL(pendingBlob)); status.textContent='Photo ready. Save your profile to upload it.'; }
+    catch(err){ pendingBlob=null; status.textContent=err.message||'Could not use that photo.'; }
+    photoInput.value='';
+  });
+  photoRemove.addEventListener('click',()=>{ pendingBlob=null; removePhoto=!!photoPath; clearPhoto(); status.textContent=photoPath?'Photo will be removed when you save.':''; });
   if(data){
     document.getElementById('pageTitle').textContent=data.is_profile_complete?'Your profile':'Create your profile';
     document.getElementById('displayName').value=data.display_name||user.user_metadata?.display_name||'';
@@ -45,6 +81,7 @@
     (data.looking_for||[]).forEach(v=>{const x=document.querySelector('input[name="looking"][value="'+CSS.escape(v)+'"]');if(x)x.checked=true;});
     (data.interests||[]).forEach(v=>{const x=document.querySelector('input[name="interest"][value="'+CSS.escape(v)+'"]');if(x)x.checked=true;});
     const initial=(data.display_name||'U').trim().charAt(0).toUpperCase();document.getElementById('avatarInitial').textContent=initial||'U';
+    loadExistingPhoto(data.photo_url);
   }
   document.getElementById('profileForm').addEventListener('submit',async(e)=>{
     e.preventDefault(); status.textContent='Saving your private profile…';
@@ -57,6 +94,15 @@
     const looking=[...document.querySelectorAll('input[name="looking"]:checked')].map(x=>x.value);
     const payload={display_name:document.getElementById('displayName').value.trim(),birth_date:dob,age,gender:document.getElementById('gender').value||null,location:document.getElementById('location').value.trim()||null,bio:document.getElementById('bio').value.trim()||null,interests,looking_for:looking,discovery_enabled:document.getElementById('discoveryEnabled').checked,is_profile_complete:true,last_active_at:new Date().toISOString()};
     if(!payload.display_name){status.textContent='Please choose a display name.';return;}
+    try{
+      if(pendingBlob){
+        const path=user.id+'/avatar.jpg';
+        const {error:upErr}=await sb.storage.from('profile-photos').upload(path,pendingBlob,{upsert:true,contentType:'image/jpeg'});
+        if(upErr) throw upErr; payload.photo_url=path;
+      } else if(removePhoto && photoPath){
+        await sb.storage.from('profile-photos').remove([photoPath]); payload.photo_url=null;
+      }
+    }catch(pe){ status.textContent='Could not save your photo: '+(pe.message||pe); return; }
     const {error:updateError}=await sb.from('profiles').update(payload).eq('id',user.id);
     if(updateError){status.textContent='Could not save your profile: '+updateError.message;return;}
     status.textContent='Profile saved. Welcome to Uncover.'; setTimeout(()=>location.href='app.html',500);
