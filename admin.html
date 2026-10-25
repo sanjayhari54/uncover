@@ -1,0 +1,59 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex"><title>Reports — Uncover admin</title><link rel="stylesheet" href="styles.css"><style>
+.filters{display:flex;gap:8px;margin-bottom:20px}.filters .btn{padding:8px 16px;font-size:13px}.filters .btn.on{background:var(--cream);color:var(--night);border-color:var(--cream)}
+.status-pill{display:inline-block;padding:3px 10px;border-radius:99px;background:rgba(255,194,122,.14);color:#f0cf9f;font-size:12px;font-weight:600}
+.status-pill.reviewed,.status-pill.actioned{background:rgba(95,207,148,.14);color:#9be3bd}
+.report-reason{margin:14px 0 4px;color:var(--text)}
+</style></head><body class="app-page">
+<header class="app-nav"><a class="brand" href="index.html"><span class="brand-mark"></span>Uncover admin</a><a class="btn outline" href="app.html">Back to app</a></header>
+<main class="app-wrap">
+<section class="app-head"><div><p class="eyebrow">Moderation</p><h1>Reports</h1><p class="muted">Newest pending reports come first. Removing a member deletes their account; the reports about them are kept.</p></div></section>
+<div class="filters"><button type="button" class="btn on" data-filter="pending">Pending</button><button type="button" class="btn" data-filter="all">All</button></div>
+<p id="status" class="muted"></p>
+<section id="reportList" class="discover-list"></section>
+</main>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script><script src="supabase-config.js"></script><script src="auth.js"></script>
+<script>
+(async function(){
+  const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[c]));
+  const status=document.getElementById('status'), list=document.getElementById('reportList');
+  const auth=window.UncoverAuth; const user=await auth.getUser();
+  if(!user){location.href='login.html';return;}
+  const sb=auth.getClient();
+  const {data:isAdmin}=await sb.rpc('is_admin');
+  if(!isAdmin){status.textContent='You don’t have access to this page.';document.querySelector('.filters').hidden=true;return;}
+  let rows=[], filter='pending';
+  function render(){
+    const shown=rows.filter(r=>filter==='all'||r.status==='pending');
+    if(!shown.length){list.innerHTML='<div class="loading-card"><strong>'+(filter==='pending'?'No pending reports.':'No reports yet.')+'</strong></div>';return;}
+    list.innerHTML=shown.map(r=>{
+      const name=r.reported_exists?(r.reported_name||'Member'):'Removed member';
+      const age=r.reported_exists&&r.reported_age?', '+esc(r.reported_age):'';
+      const when=r.created_at?new Date(r.created_at).toLocaleString():'';
+      const actions=[];
+      if(r.status==='pending') actions.push('<button type="button" class="btn outline" data-act="reviewed" data-id="'+esc(r.report_id)+'">Mark reviewed</button>');
+      else actions.push('<button type="button" class="btn outline" data-act="pending" data-id="'+esc(r.report_id)+'">Reopen</button>');
+      if(r.reported_exists) actions.push('<button type="button" class="btn outline danger" data-remove="'+esc(r.reported_id)+'" data-name="'+esc(name)+'">Remove member</button>');
+      return '<article class="discover-card"><div class="discover-avatar" aria-hidden="true">!</div><div class="discover-content"><div class="discover-top"><div><span class="status-pill '+esc(r.status)+'">'+esc(r.status)+'</span><h2>'+esc(name)+age+'</h2><p class="muted">'+esc(r.reports_against)+' report'+(Number(r.reports_against)===1?'':'s')+' against them · blocked by '+esc(r.blocks_against)+' · '+esc(when)+'</p></div></div><p class="report-reason"><b>Reason:</b> '+esc(r.reason)+'</p>'+(r.details?'<p class="muted">'+esc(r.details)+'</p>':'')+'<div class="discover-actions">'+actions.join('')+'</div></div></article>';
+    }).join('');
+  }
+  async function load(){
+    status.textContent='Loading reports…';
+    const {data,error}=await sb.rpc('admin_list_reports');
+    if(error){status.textContent='Could not load reports: '+error.message;return;}
+    rows=data||[]; status.textContent=''; render();
+  }
+  document.querySelectorAll('[data-filter]').forEach(b=>b.addEventListener('click',()=>{filter=b.dataset.filter;document.querySelectorAll('[data-filter]').forEach(x=>x.classList.toggle('on',x===b));render();}));
+  list.addEventListener('click',async e=>{
+    const btn=e.target.closest('button'); if(!btn) return;
+    try{
+      if(btn.dataset.act){
+        btn.disabled=true; const {error}=await sb.rpc('admin_set_report_status',{p_report:btn.dataset.id,p_status:btn.dataset.act}); if(error) throw error; await load();
+      } else if(btn.dataset.remove){
+        if(!confirm('Remove '+btn.dataset.name+' permanently?\n\nTheir account, profile, messages and connections will be deleted. This cannot be undone.')) return;
+        btn.disabled=true; const {error}=await sb.rpc('admin_remove_user',{p_user:btn.dataset.remove}); if(error) throw error; await load();
+      }
+    }catch(err){ status.textContent='Action failed: '+(err.message||err); btn.disabled=false; }
+  });
+  load();
+})();
+</script></body></html>
