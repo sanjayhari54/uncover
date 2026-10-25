@@ -79,9 +79,9 @@
       if (!rows.length) { section.hidden = true; return; }
       section.hidden = false;
       list.innerHTML = rows.map(n => {
-        const title = n.kind === 'message' ? 'New private message' :
+        const title = n.kind === 'like' ? 'Someone liked you' : n.kind === 'message' ? 'New private message' :
           n.kind === 'connection' ? 'Connection update' : 'Safety update';
-        const text = n.kind === 'message' ? 'Someone sent you a message.' :
+        const text = n.kind === 'like' ? 'Someone liked your conversation. Like back to reveal profiles.' : n.kind === 'message' ? 'Someone sent you a message.' :
           n.kind === 'connection' ? 'Someone approved your connection.' :
           'Your safety action was completed.';
         const when = n.created_at ? new Date(n.created_at).toLocaleString() : '';
@@ -139,11 +139,27 @@
       }
       const uniqueActive = uniqueByPerson(activeChats);
       const uniqueBlocked = uniqueByPerson(blockedChats);
+      const { data: connRows } = await sb.rpc('my_connections');
+      const connByOther = new Map((connRows || []).map(r => [r.other_user_id, r]));
+      const names = new Map();
+      await Promise.all(uniqueActive.filter(c => connByOther.get(c.user_a === user.id ? c.user_b : c.user_a)?.revealed).map(async c => {
+        const id = c.user_a === user.id ? c.user_b : c.user_a;
+        try {
+          const { data: p } = await sb.rpc('get_revealed_profile', { p_other_user: id });
+          const prof = Array.isArray(p) ? p[0] : p;
+          if (prof?.display_name) names.set(id, prof.display_name);
+        } catch (_) {}
+      }));
       const rowHtml = (c, blocked=false) => {
         const other = c.user_a === user.id ? c.user_b : c.user_a;
         const activity = lastActivity.get(c.id) || c.created_at;
         const stamp = activity ? new Date(activity).toLocaleDateString([], {month:'short',day:'numeric'}) : '';
-        return `<article class="chat-row${blocked?' blocked':''}"><div class="chat-orb" aria-hidden="true">${blocked?'×':'?'}</div><div class="chat-row-copy"><h3>${blocked?'Blocked conversation':'Someone you’re talking to'}</h3><p>${blocked?'Chat closed · blocked':('Private conversation · '+escapeHtml(stamp))}</p></div>${blocked?'<span class="muted" style="font-size:12px">Closed</span>':`<button class="btn dark" type="button" data-open-chat="${escapeHtml(c.id)}" data-other-user="${escapeHtml(other)}">Open chat →</button>`}</article>`;
+        const name = blocked ? null : names.get(other);
+        const conn = connByOther.get(other);
+        const theirsLiked = conn ? (conn.is_incoming ? conn.sender_approved : conn.receiver_approved) : false;
+        const mineLiked = conn ? (conn.is_incoming ? conn.receiver_approved : conn.sender_approved) : false;
+        const badge = (!blocked && conn && !conn.revealed && theirsLiked && !mineLiked) ? '<span class="chat-badge">♥ Liked you</span>' : '';
+        return `<article class="chat-row${blocked?' blocked':''}"><div class="chat-orb" aria-hidden="true">${blocked?'×':(name?escapeHtml(name.trim().charAt(0).toUpperCase()):'?')}</div><div class="chat-row-copy"><h3>${blocked?'Blocked conversation':(name?escapeHtml(name):'Someone you’re talking to')}</h3><p>${blocked?'Chat closed · blocked':('Private conversation · '+escapeHtml(stamp))}</p></div>${badge}${blocked?'<span class="muted" style="font-size:12px">Closed</span>':`<button class="btn dark" type="button" data-open-chat="${escapeHtml(c.id)}" data-other-user="${escapeHtml(other)}">Open chat →</button>`}</article>`;
       };
       section.hidden = !uniqueActive.length && !uniqueBlocked.length;
       list.innerHTML = uniqueActive.map(c => rowHtml(c)).join('') || '<div class="loading-card">No active private chats yet.</div>';

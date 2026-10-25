@@ -69,11 +69,32 @@
       const dedupe = arr => { const seen = new Set(); return arr.filter(c => { const id=other(c); if (!id || seen.has(id)) return false; seen.add(id); return true; }); };
       const active = dedupe(all.filter(c => c.status === 'active' && !blockedIds.has(other(c))));
       const blocked = dedupe(all.filter(c => blockedIds.has(other(c))));
+      const { data: connRows } = await sb.rpc('my_connections');
+      const connByOther = new Map((connRows || []).map(r => [r.other_user_id, r]));
+      const revealedInfo = new Map();
+      await Promise.all(active.filter(c => connByOther.get(other(c))?.revealed).map(async c => {
+        const id = other(c);
+        try {
+          const { data: p } = await sb.rpc('get_revealed_profile', { p_other_user: id });
+          const prof = Array.isArray(p) ? p[0] : p;
+          if (!prof) return;
+          let photo = '';
+          if (prof.photo_url) { try { const { data: s } = await sb.storage.from('profile-photos').createSignedUrl(prof.photo_url, 3600); photo = s?.signedUrl || ''; } catch (_) {} }
+          revealedInfo.set(id, { name: prof.display_name || 'Connection', photo });
+        } catch (_) {}
+      }));
       const row = (c, isBlocked=false) => {
         const msg = lastByConversation.get(c.id);
         const snippet = isBlocked ? 'Conversation closed · blocked' : (msg ? ((msg.sender_id === me ? 'You: ' : '') + String(msg.message || '').slice(0,85)) : 'Start the conversation with a thoughtful hello.');
         const when = activity(c) ? new Date(activity(c)).toLocaleDateString([], {month:'short',day:'numeric'}) : '';
-        return `<article class="chat-inbox-row${isBlocked?' blocked':''}"><div class="chat-orb" aria-hidden="true">${isBlocked?'×':'?'}</div><div class="chat-row-copy"><h3>${isBlocked?'Blocked conversation':'Anonymous conversation'}</h3><p>${escapeHtml(snippet)}</p></div><span class="chat-row-time">${escapeHtml(when)}</span>${isBlocked?'<span class="muted" style="font-size:12px">Closed</span>':`<button class="btn dark" type="button" data-inbox-open="${escapeHtml(c.id)}" data-inbox-user="${escapeHtml(other(c))}">Open →</button>`}</article>`;
+        const conn = connByOther.get(other(c)); const info = isBlocked ? null : revealedInfo.get(other(c));
+        const mineLiked = conn ? (conn.is_incoming ? conn.receiver_approved : conn.sender_approved) : false;
+        const theirsLiked = conn ? (conn.is_incoming ? conn.sender_approved : conn.receiver_approved) : false;
+        const badge = (!isBlocked && conn && !conn.revealed && theirsLiked && !mineLiked) ? '<span class="chat-badge">♥ Liked you</span>' : '';
+        const orbStyle = info && info.photo ? ' style="background-image:url(&quot;' + escapeHtml(info.photo) + '&quot;);background-size:cover;background-position:center;color:transparent"' : '';
+        const orbText = isBlocked ? '×' : (info ? escapeHtml((info.name || 'U').trim().charAt(0).toUpperCase()) : '?');
+        const title = isBlocked ? 'Blocked conversation' : (info ? escapeHtml(info.name) : 'Anonymous conversation');
+        return `<article class="chat-inbox-row${isBlocked?' blocked':''}"><div class="chat-orb"${orbStyle} aria-hidden="true">${orbText}</div><div class="chat-row-copy"><h3>${title}</h3><p>${escapeHtml(snippet)}</p></div>${badge}<span class="chat-row-time">${escapeHtml(when)}</span>${isBlocked?'<span class="muted" style="font-size:12px">Closed</span>':`<button class="btn dark" type="button" data-inbox-open="${escapeHtml(c.id)}" data-inbox-user="${escapeHtml(other(c))}">Open →</button>`}</article>`;
       };
       activeList.innerHTML = active.map(c => row(c)).join('') || '<div class="chat-inbox-empty">No active chats yet. Start a private conversation from Discover.</div>';
       activeList.querySelectorAll('[data-inbox-open]').forEach(btn => btn.addEventListener('click', () => {
@@ -144,6 +165,50 @@
       }
 
       otherUserId = convo.user_a === me ? convo.user_b : convo.user_a;
+
+      async function applyConnectionState() {
+        try {
+          const { data: conns } = await sb.rpc('my_connections');
+          const conn = (conns || []).find(r => r.other_user_id === otherUserId);
+          const mine = conn ? (conn.is_incoming ? conn.receiver_approved : conn.sender_approved) : false;
+          const theirs = conn ? (conn.is_incoming ? conn.sender_approved : conn.receiver_approved) : false;
+          const nameEl = $('.chat-anon strong'), subEl = $('.chat-anon small'), orb = $('.mini-orb');
+          const banner = $('.privacy-banner'), sideTitle = $('.chat-side h2'), sideText = $('.chat-side p.muted');
+          const likeBtns = document.querySelectorAll('[data-like-connection]');
+          if (conn && conn.revealed) {
+            const { data: p } = await sb.rpc('get_revealed_profile', { p_other_user: otherUserId });
+            const prof = Array.isArray(p) ? p[0] : p;
+            if (prof) {
+              if (nameEl) nameEl.textContent = prof.display_name || 'Connection';
+              if (subEl) subEl.textContent = 'Connected · profiles revealed';
+              if (orb) {
+                orb.textContent = (prof.display_name || 'U').trim().charAt(0).toUpperCase();
+                if (prof.photo_url) {
+                  try {
+                    const { data: s } = await sb.storage.from('profile-photos').createSignedUrl(prof.photo_url, 3600);
+                    if (s?.signedUrl) { orb.style.backgroundImage = 'url("' + s.signedUrl + '")'; orb.style.backgroundSize = 'cover'; orb.style.backgroundPosition = 'center'; orb.style.color = 'transparent'; }
+                  } catch (_) {}
+                }
+              }
+            }
+            if (banner) banner.textContent = '✓ You both approved. Your profiles are now visible to each other.';
+            if (sideTitle) sideTitle.textContent = 'You’re connected';
+            if (sideText) sideText.textContent = 'You both said yes. Keep chatting, or open Connections to see their full profile.';
+            likeBtns.forEach(b => { b.hidden = true; });
+          } else if (mine) {
+            if (sideTitle) sideTitle.textContent = 'Waiting for them';
+            if (sideText) sideText.textContent = 'You liked this conversation. Your profile stays hidden until they like back.';
+            likeBtns.forEach(b => { b.textContent = 'Liked ♥'; b.disabled = true; b.dataset.liked = '1'; });
+          } else if (theirs) {
+            if (banner) banner.textContent = '♥ They liked this conversation. Like back to reveal your profiles to each other.';
+            if (sideTitle) sideTitle.textContent = 'They liked you';
+            if (sideText) sideText.textContent = 'Like back and you will both see each other’s profile. If you’re not sure yet, keep chatting.';
+            likeBtns.forEach(b => { b.textContent = 'Like back ♥'; });
+          }
+        } catch (e) { console.warn('Could not load connection state:', e); }
+      }
+      await applyConnectionState();
+      setInterval(() => { if (!document.hidden) applyConnectionState(); }, 20000);
 
       function scrollMessagesToBottom() {
         // Scroll the message pane itself and ensure the newest bubble is visible.
@@ -228,17 +293,13 @@
           try {
             const { data, error } = await sb.rpc('approve_connection', { p_other_user: otherUserId });
             if (error) throw error;
-            if (data === true) {
-              alert('It’s a match! Both of you approved. The profile is now revealed.');
-              location.href = 'connections.html';
-            } else {
-              alert('Your approval has been recorded. Your profile stays hidden until the other person approves too.');
-            }
+            alert(data === true ? 'It’s a match! Both of you approved. Your profiles are now revealed.' : 'Your like has been sent. Your profile stays hidden until they like back.');
+            await applyConnectionState();
           } catch (err) {
             console.error('Connection error:', err);
             alert(err?.message || 'Could not send the connection request.');
           } finally {
-            btn.disabled = false;
+            if (btn.dataset.liked !== '1' && !btn.hidden) btn.disabled = false;
           }
         });
       });
