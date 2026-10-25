@@ -3,6 +3,10 @@
 .photo-preview{width:96px;height:96px;border-radius:50%;background:#f1eee9 center/cover no-repeat;display:grid;place-items:center;font-weight:700;font-size:32px;color:#49413a;border:1px solid var(--line);flex:0 0 96px}
 .photo-actions{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:6px}
 .photo-actions .btn{padding:9px 16px;font-size:13px}
+.danger-zone{margin-top:40px;padding-top:24px;border-top:1px solid var(--line)}
+.danger-zone h2{font-size:20px;margin:0 0 6px}
+.btn.danger{color:#b3261e;border-color:#e3b5b1}
+.btn.danger:hover{background:#fbeceb}
 </style></head><body class="app-page">
 <header class="app-nav"><a class="brand" href="index.html"><span class="brand-mark">○</span> Uncover</a><nav><a href="app.html">Discover</a><a href="chat.html">Chats</a><a href="connections.html">Connections</a><a class="active" href="profile.html">My Profile</a></nav><button class="avatar" data-signout title="Log out">U</button></header>
 <main class="profile-wrap profile-editor-wrap">
@@ -27,6 +31,7 @@
       <p id="status" class="muted status-text"></p>
       <button class="btn dark full" type="submit" id="saveBtn">Save &amp; continue →</button>
     </form>
+    <div class="danger-zone"><h2>Delete account</h2><p class="muted">Permanently delete your account, profile, photo, messages and connections. This cannot be undone.</p><button type="button" class="btn outline danger" id="deleteAccountBtn">Delete my account</button></div>
   </div>
 </section>
 <aside class="privacy-card"><span class="lock">🔒</span><h2>You control your reveal.</h2><p>Your full profile is not shared with people you chat with. It becomes visible only after both people approve a connection.</p><div class="privacy-list"><span>✓ Your photo stays hidden</span><span>✓ Your display name stays hidden</span><span>✓ You can block or report</span></div><a href="safety.html">Read our safety principles →</a></aside>
@@ -83,6 +88,22 @@
     const initial=(data.display_name||'U').trim().charAt(0).toUpperCase();document.getElementById('avatarInitial').textContent=initial||'U';
     loadExistingPhoto(data.photo_url);
   }
+  document.getElementById('deleteAccountBtn').addEventListener('click',async()=>{
+    if(!confirm('Delete your account permanently?\n\nThis removes your profile, photo, messages and connections. Conversations you shared with other people will also disappear for them. This cannot be undone.')) return;
+    const typed=prompt('To confirm, type DELETE in capital letters.');
+    if(typed!=='DELETE'){ status.textContent='Account was not deleted.'; return; }
+    const btn=document.getElementById('deleteAccountBtn'); btn.disabled=true; status.textContent='Deleting your account…';
+    try{
+      // Remove stored photos first (storage files are not removed by the database).
+      try{ const {data:files}=await sb.storage.from('profile-photos').list(user.id); if(files&&files.length) await sb.storage.from('profile-photos').remove(files.map(f=>user.id+'/'+f.name)); }catch(_){}
+      const {error:delError}=await sb.rpc('delete_my_account');
+      if(delError) throw delError;
+      try{ await sb.auth.signOut(); }catch(_){}
+      try{ Object.keys(localStorage).filter(k=>k.startsWith('sb-')||k.startsWith('uncover_')).forEach(k=>localStorage.removeItem(k)); }catch(_){}
+      alert('Your account has been deleted.');
+      location.href='index.html';
+    }catch(err){ btn.disabled=false; status.textContent='Could not delete your account: '+(err.message||err); }
+  });
   document.getElementById('profileForm').addEventListener('submit',async(e)=>{
     e.preventDefault(); status.textContent='Saving your private profile…';
     const dob=document.getElementById('birthDate').value;
