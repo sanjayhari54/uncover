@@ -37,9 +37,9 @@
       ? looking.map(x => escapeHtml(x)).join(' · ')
       : 'Open to conversation';
 
-    const location = person.location ? escapeHtml(person.location) : 'Somewhere nearby';
-    const bio = person.bio ? escapeHtml(person.bio) : 'Open to a thoughtful conversation.';
-    const age = Number.isFinite(Number(person.age)) ? escapeHtml(person.age) : '18+';
+    // Anonymous cards show only an age range, gender (if shared), interests and intent.
+    const age = person.age_range ? escapeHtml(person.age_range) : '18+';
+    const gender = person.gender ? escapeHtml(person.gender) : '';
 
     return `
       <article class="discover-card" data-user-id="${escapeHtml(person.user_id)}">
@@ -49,11 +49,10 @@
             <div>
               <p class="eyebrow">ANONYMOUS</p>
               <h2>Someone</h2>
-              <p class="muted">${age} · ${location}</p>
+              <p class="muted">${age}${gender ? ' · ' + gender : ''}</p>
             </div>
             <span class="status-dot" title="Discoverable"></span>
           </div>
-          <p class="discover-bio">${bio}</p>
           <div class="tags">${interestHtml}</div>
           <p class="discover-looking"><strong>Looking for:</strong> ${lookingHtml}</p>
           <div class="discover-actions">
