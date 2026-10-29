@@ -18,6 +18,7 @@
     <p class="muted">Your name and photo stay private. Other people only see your full profile after you both approve the connection.</p>
     <form id="profileForm">
       <div class="field"><label>Profile photo <span class="muted">(optional)</span></label><div class="photo-row"><div class="photo-preview" id="photoPreview" aria-hidden="true">U</div><div><div class="photo-actions"><input id="photoInput" type="file" accept="image/jpeg,image/png,image/webp" hidden><button type="button" class="btn outline" id="photoChoose">Choose photo</button><button type="button" class="btn outline" id="photoRemove" hidden>Remove</button></div><small class="field-help">Stays hidden until you both approve a connection. Use a clear photo of yourself. No nudity, and no photos of other people. JPG, PNG or WebP.</small></div></div></div>
+      <div class="field"><label>Anonymous avatar</label><div id="emojiPicker" class="emoji-grid"></div><small class="field-help">Shown on your anonymous card and in chats until you both reveal.</small></div>
       <div class="form-grid">
         <div class="field"><label for="displayName">Display name</label><input id="displayName" maxlength="40" required placeholder="How you'd like to be known"></div>
         <div class="field"><label for="birthDate">Date of birth</label><input id="birthDate" type="date" required><small class="field-help">You must be 18 or older.</small></div>
@@ -45,6 +46,7 @@
   const sb=auth.getClient();
   const {data,error}=await sb.from('profiles').select('*').eq('id',user.id).maybeSingle();
   if(error){status.textContent='Could not load your profile: '+error.message;return;}
+  const getEmoji=auth.renderEmojiPicker(document.getElementById('emojiPicker'),(data&&data.anon_emoji)||auth.randomEmoji());
   let photoPath=null, pendingBlob=null, removePhoto=false;
   const photoPreview=document.getElementById('photoPreview'), photoInput=document.getElementById('photoInput'), photoChoose=document.getElementById('photoChoose'), photoRemove=document.getElementById('photoRemove'), avatarEl=document.getElementById('avatarInitial');
   function showPhoto(url){ [photoPreview,avatarEl].forEach(el=>{ if(!el)return; el.style.backgroundImage='url("'+url+'")'; el.style.backgroundSize='cover'; el.style.backgroundPosition='center'; el.style.color='transparent'; }); photoRemove.hidden=false; }
@@ -113,7 +115,7 @@
     if(age>100){status.textContent='Please check your date of birth.';return;}
     const interests=[...document.querySelectorAll('input[name="interest"]:checked')].map(x=>x.value);
     const looking=[...document.querySelectorAll('input[name="looking"]:checked')].map(x=>x.value);
-    const payload={display_name:document.getElementById('displayName').value.trim(),birth_date:dob,age,gender:document.getElementById('gender').value||null,location:document.getElementById('location').value.trim()||null,bio:document.getElementById('bio').value.trim()||null,interests,looking_for:looking,discovery_enabled:document.getElementById('discoveryEnabled').checked,is_profile_complete:true,last_active_at:new Date().toISOString()};
+    const payload={display_name:document.getElementById('displayName').value.trim(),birth_date:dob,age,gender:document.getElementById('gender').value||null,location:document.getElementById('location').value.trim()||null,bio:document.getElementById('bio').value.trim()||null,interests,looking_for:looking,discovery_enabled:document.getElementById('discoveryEnabled').checked,is_profile_complete:true,last_active_at:new Date().toISOString(),anon_emoji:getEmoji()};
     if(!payload.display_name){status.textContent='Please choose a display name.';return;}
     try{
       if(pendingBlob){

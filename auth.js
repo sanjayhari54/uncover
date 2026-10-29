@@ -32,23 +32,33 @@
       location: draft.location || null,
       bio: draft.bio || null,
       interests: Array.isArray(draft.interests) ? draft.interests : [],
-      looking_for: Array.isArray(draft.looking_for) ? draft.looking_for : []
+      looking_for: Array.isArray(draft.looking_for) ? draft.looking_for : [],
+      anon_emoji: ANON_EMOJIS.includes(draft.anon_emoji) ? draft.anon_emoji : randomEmoji()
       // free_chats_used, free_chats_limit and is_premium come from database
       // defaults and cannot be written from the browser.
     });
     localStorage.removeItem('uncover_profile_draft');
   }
 
+  const ANON_EMOJIS = ['🦊','🐼','🐨','🦁','🐯','🐸','🐵','🦉','🦄','🐙','🐳','🦋','🌸','🌙','⭐','🔥','🌈','🍀','🎧','🎨','📚','☕','🌊','🌻'];
+  const randomEmoji = () => ANON_EMOJIS[Math.floor(Math.random() * ANON_EMOJIS.length)];
+  function renderEmojiPicker(el, selected) {
+    if (!el) return () => selected;
+    el.innerHTML = ANON_EMOJIS.map(e => '<label class="emoji-opt"><input type="radio" name="anonEmoji" value="' + e + '"' + (e === selected ? ' checked' : '') + '><span>' + e + '</span></label>').join('');
+    return () => (el.querySelector('input:checked') || {}).value || selected;
+  }
+
   window.UncoverAuth = {
+    ANON_EMOJIS, randomEmoji, renderEmojiPicker,
     getClient,
     getUser,
     ensureProfile,
-    async signUp({ email, password, display_name }) {
+    async signUp({ email, password, display_name, anon_emoji }) {
       const sb = getClient();
       if (!sb) throw new Error('Supabase has not loaded yet. Refresh and try again.');
-      const { data, error } = await sb.auth.signUp({ email, password, options: { emailRedirectTo: window.location.origin + window.location.pathname.replace(/[^/]+$/, 'login.html'), data: { accepted_terms_at: new Date().toISOString() } } });
+      const { data, error } = await sb.auth.signUp({ email, password, options: { emailRedirectTo: window.location.origin + window.location.pathname.replace(/[^/]+$/, 'login.html'), data: { accepted_terms_at: new Date().toISOString(), display_name, anon_emoji } } });
       if (error) throw error;
-      localStorage.setItem('uncover_profile_draft', JSON.stringify({ display_name }));
+      localStorage.setItem('uncover_profile_draft', JSON.stringify({ display_name, anon_emoji }));
       if (data.user && data.session) await ensureProfile(data.user);
       return data;
     },

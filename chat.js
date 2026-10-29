@@ -71,6 +71,8 @@
       const blocked = dedupe(all.filter(c => blockedIds.has(other(c))));
       const { data: connRows } = await sb.rpc('my_connections');
       const connByOther = new Map((connRows || []).map(r => [r.other_user_id, r]));
+      const { data: partnerRows } = await sb.rpc('my_chat_partners');
+      const emojiByOther = new Map((partnerRows || []).map(r => [r.other_user_id, r.anon_emoji]));
       const revealedInfo = new Map();
       await Promise.all(active.filter(c => connByOther.get(other(c))?.revealed).map(async c => {
         const id = other(c);
@@ -92,7 +94,7 @@
         const theirsLiked = conn ? (conn.is_incoming ? conn.sender_approved : conn.receiver_approved) : false;
         const badge = (!isBlocked && conn && !conn.revealed && theirsLiked && !mineLiked) ? '<span class="chat-badge">♥ Liked you</span>' : '';
         const orbStyle = info && info.photo ? ' style="background-image:url(&quot;' + escapeHtml(info.photo) + '&quot;);background-size:cover;background-position:center;color:transparent"' : '';
-        const orbText = isBlocked ? '×' : (info ? escapeHtml((info.name || 'U').trim().charAt(0).toUpperCase()) : '?');
+        const orbText = isBlocked ? '×' : (info ? escapeHtml((info.name || 'U').trim().charAt(0).toUpperCase()) : (emojiByOther.get(other(c)) || '?'));
         const title = isBlocked ? 'Blocked conversation' : (info ? escapeHtml(info.name) : 'Anonymous conversation');
         return `<article class="chat-inbox-row${isBlocked?' blocked':''}"><div class="chat-orb"${orbStyle} aria-hidden="true">${orbText}</div><div class="chat-row-copy"><h3>${title}</h3><p>${escapeHtml(snippet)}</p></div>${badge}<span class="chat-row-time">${escapeHtml(when)}</span>${isBlocked?'<span class="muted" style="font-size:12px">Closed</span>':`<button class="btn dark" type="button" data-inbox-open="${escapeHtml(c.id)}" data-inbox-user="${escapeHtml(other(c))}">Open →</button>`}</article>`;
       };
@@ -166,7 +168,16 @@
 
       otherUserId = convo.user_a === me ? convo.user_b : convo.user_a;
 
+      async function applyPartnerEmoji() {
+        try {
+          const { data } = await sb.rpc('my_chat_partners');
+          const hit = (data || []).find(x => x.other_user_id === otherUserId);
+          const orb = $('.mini-orb');
+          if (hit && hit.anon_emoji && orb && !orb.dataset.revealed) orb.textContent = hit.anon_emoji;
+        } catch (_) {}
+      }
       async function applyConnectionState() {
+        await applyPartnerEmoji();
         try {
           const { data: conns } = await sb.rpc('my_connections');
           const conn = (conns || []).find(r => r.other_user_id === otherUserId);
@@ -182,6 +193,7 @@
               if (nameEl) nameEl.textContent = prof.display_name || 'Connection';
               if (subEl) subEl.textContent = 'Connected · profiles revealed';
               if (orb) {
+                orb.dataset.revealed = '1';
                 orb.textContent = (prof.display_name || 'U').trim().charAt(0).toUpperCase();
                 if (prof.photo_url) {
                   try {

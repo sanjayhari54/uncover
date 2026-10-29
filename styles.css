@@ -97,6 +97,14 @@ input,select,textarea{font:inherit;color:var(--text)}
 .loading-card{display:grid;gap:8px;justify-items:start;padding:26px;background:var(--surface);border:1px dashed var(--line-strong);border-radius:20px;color:var(--text-2)}
 .privacy-strip{display:flex;flex-wrap:wrap;align-items:center;gap:8px 18px;margin-top:28px;padding:16px 20px;background:var(--surface);border:1px solid var(--line);border-radius:16px;font-size:14px;color:var(--text-2)}.privacy-strip a{margin-left:auto;color:var(--rose)}
 .connection-grid{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+/* emoji avatar picker */
+.emoji-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(46px,1fr));gap:8px}
+.emoji-opt{position:relative;cursor:pointer}.emoji-opt input{position:absolute;inset:0;width:100%;height:100%;margin:0;opacity:0;cursor:pointer}
+.emoji-opt span{display:grid;place-items:center;height:46px;background:var(--surface-2);border:1px solid var(--line);border-radius:14px;font-size:24px;transition:transform .15s,border-color .15s}
+.emoji-opt:hover span{transform:translateY(-2px)}
+.emoji-opt input:checked+span{background:rgba(242,139,173,.16);border-color:var(--rose);box-shadow:0 0 0 3px rgba(242,139,173,.18)}
+.emoji-opt input:focus-visible+span{outline:2px solid var(--glow);outline-offset:2px}
+.chat-orb{font-size:20px}
 /* the veil lifts when a connection is revealed */
 .connection-card .discover-avatar::after{content:'';position:absolute;inset:0;border-radius:inherit;background:rgba(36,26,59,.55);-webkit-backdrop-filter:blur(16px);backdrop-filter:blur(16px);opacity:0;animation:lift 1.8s .35s ease-out backwards}
 @keyframes lift{from{opacity:1}}
